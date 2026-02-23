@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-45f1d99afdf476a4f378.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "ControleCorteDobra",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ControleCorteDobra::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ControleCorteDobra-Debug-8b1970f125d2eac25554.json",
+					"name" : "ControleCorteDobra",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ControleCorteDobra_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ControleCorteDobra_autogen-Debug-3fe730a42563a68942fc.json",
+					"name" : "ControleCorteDobra_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ControleCorteDobra_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ControleCorteDobra_autogen_timestamp_deps-Debug-0382d77d5fdcef8f1ee9.json",
+					"name" : "ControleCorteDobra_autogen_timestamp_deps",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/pcp-02/Desktop/Ambiente teste/009 - Programa Plano de Corte/build/Desktop_Qt_6_8_0_MinGW_64_bit-Debug",
+		"source" : "C:/Users/pcp-02/Desktop/Ambiente teste/009 - Programa Plano de Corte"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}
