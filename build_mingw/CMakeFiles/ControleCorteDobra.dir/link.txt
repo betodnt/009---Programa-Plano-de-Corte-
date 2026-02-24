@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\ControleCorteDobra.dir/objects.a
+C:\Qt\Tools\mingw1310_64\bin\ar.exe qc CMakeFiles\ControleCorteDobra.dir/objects.a @CMakeFiles\ControleCorteDobra.dir\objects1.rsp
+C:\Qt\Tools\mingw1310_64\bin\c++.exe -mwindows -Wl,--whole-archive CMakeFiles\ControleCorteDobra.dir/objects.a -Wl,--no-whole-archive -o ControleCorteDobra.exe -Wl,--out-implib,libControleCorteDobra.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\ControleCorteDobra.dir\linkLibs.rsp

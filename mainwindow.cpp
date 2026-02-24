@@ -13,15 +13,37 @@
 #include <QElapsedTimer> // Incluir a classe para o timer
 #include <QLabel>
 #include <QTimer>
+#include <QSaveFile>
+#include <QtConcurrent/QtConcurrentRun>
+#include <QFuture>
 
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , elapsedTimer(new QElapsedTimer)
     , timer(new QTimer(this))
 {
     ui->setupUi(this);
+
+    // Inicializar watcher e dialog de progresso para buscas assíncronas
+    searchWatcher = new QFutureWatcher<QStringList>(this);
+    progressDialog = new QProgressDialog("Buscando arquivos...", "Cancelar", 0, 0, this);
+    progressDialog->setWindowModality(Qt::WindowModal);
+    progressDialog->setAutoClose(false);
+    connect(searchWatcher, &QFutureWatcher<QStringList>::finished, this, &MainWindow::onSearchFinished);
+    connect(progressDialog, &QProgressDialog::canceled, this, &MainWindow::onCancelSearch);
+
+    // watcher para busca recursiva de PDF
+    pdfWatcher = new QFutureWatcher<QString>(this);
+    connect(pdfWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onPdfSearchFinished);
+
+    progressPoller = new QTimer(this);
+    progressPoller->setInterval(200);
+    connect(progressPoller, &QTimer::timeout, this, &MainWindow::onProgressTimeout);
+
+    searchCanceled.store(false);
+    searchProgress.store(0);
+    searchTotal.store(0);
 
     labelTimer = ui->labelTimer;
     labelTimer->setText("00:00:00");
@@ -45,7 +67,7 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::updateTimerDisplay()
 {
     // Calcula o tempo decorrido desde que o timer foi iniciado
-    qint64 elapsed = elapsedTimer->elapsed();
+    qint64 elapsed = elapsedTimer.elapsed();
 
     // Converte o tempo decorrido em horas, minutos e segundos
     QTime time(0, 0, 0);
@@ -59,7 +81,6 @@ void MainWindow::updateTimerDisplay()
 MainWindow::~MainWindow()
 {
     delete ui;
-    delete elapsedTimer;
 }
 
 // Slot chamado quando o usuário termina de editar o campo Pedido
@@ -73,17 +94,37 @@ void MainWindow::on_linePedido_editingFinished()
 
 void MainWindow::searchFiles(const QString &pedido)
 {
+    // Executa a busca de forma assíncrona para não bloquear a UI
+    ui->comboBox->clear();
+    ui->comboBox->setEnabled(false);
+    ui->pushButtonIniciar->setEnabled(false);
+    // preparar estado para nova busca
+    searchCanceled.store(false);
+    searchProgress.store(0);
+    searchTotal.store(0);
+    progressDialog->setLabelText("Buscando arquivos...");
+    progressDialog->setMaximum(0);
+    progressDialog->show();
+    progressPoller->start();
+
+    QString tipo = ui->cbox_Tipo->currentText();
+    QFuture<QStringList> future = QtConcurrent::run([=]{ return this->performSearchFiles(pedido, tipo); });
+    searchWatcher->setFuture(future);
+}
+
+QStringList MainWindow::performSearchFiles(const QString &pedido, const QString &tipo)
+{
+    QStringList results;
     QDir dir("\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\1. SAÍDAS A CORTAR");
     QStringList filters;
     filters << "*.cnc";
     dir.setNameFilters(filters);
     QFileInfoList fileList = dir.entryInfoList();
-
-    ui->comboBox->clear(); // Limpa a lista suspensa antes de preencher
-
-    // Identifica o prefixo baseado no tipo selecionado
-    QString tipo = ui->cbox_Tipo->currentText();  // Supondo que a QComboBox de tipo se chama comboBoxTipo
     QString prefixo;
+
+    // definir total para barra de progresso determinística
+    searchTotal.store(fileList.size());
+    searchProgress.store(0);
 
     if (tipo == "Pedido") {
         prefixo = "P";
@@ -96,28 +137,62 @@ void MainWindow::searchFiles(const QString &pedido)
     } else if (tipo == "Reforma") {
         prefixo = "R";
     } else {
-        QMessageBox::warning(this, "Erro", "Tipo de arquivo não reconhecido.");
-        return;
+        return results; // vazio
     }
 
-    foreach (const QFileInfo &fileInfo, fileList)
+    for (int i = 0; i < fileList.size(); ++i)
     {
+        if (searchCanceled.load()) break; // cooperativo: respeitar cancelamento
+        const QFileInfo &fileInfo = fileList.at(i);
         QString fileName = fileInfo.fileName();
         QStringList parts = fileName.split('_');
 
-        // Procurar a parte que começa com o prefixo definido e comparar com o pedido
         foreach (const QString &part, parts)
         {
             if (part.startsWith(prefixo) && part.mid(1) == pedido)
             {
-                ui->comboBox->addItem(fileName);
+                results << fileName;
                 break;
             }
         }
+        searchProgress.fetch_add(1);
     }
 
-    if (ui->comboBox->count() == 0) {
+    // marcar progresso como completo
+    searchProgress.store(searchTotal.load());
+    return results;
+}
+
+void MainWindow::onSearchFinished()
+{
+    QStringList results = searchWatcher->result();
+    progressPoller->stop();
+    progressDialog->hide();
+    ui->comboBox->clear();
+    ui->comboBox->addItems(results);
+    ui->comboBox->setEnabled(true);
+    ui->pushButtonIniciar->setEnabled(true);
+    if (results.isEmpty()) {
         QMessageBox::information(this, "Aviso", "Não foi encontrada nenhuma saída CNC para este pedido.");
+    }
+}
+
+void MainWindow::onCancelSearch()
+{
+    searchCanceled.store(true);
+    progressDialog->setLabelText("Cancelando...");
+    progressDialog->setCancelButtonText(QString());
+}
+
+void MainWindow::onProgressTimeout()
+{
+    int total = searchTotal.load();
+    int prog = searchProgress.load();
+    if (total > 0) {
+        progressDialog->setMaximum(total);
+        progressDialog->setValue(prog);
+    } else {
+        progressDialog->setMaximum(0);
     }
 }
 
@@ -148,57 +223,40 @@ void MainWindow::on_pushButtonIniciar_clicked()
 
     // Obtenha a data e hora atuais
     QString dataHoraInicio = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
-
-    // Salvar as informações iniciais no XML
-    QFile file("\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\3. DADOS\\dados.xml");
-    if (!file.open(QIODevice::ReadWrite | QIODevice::Text))
-    {
-        QMessageBox::warning(this, "Erro", "Não foi possível abrir o arquivo XML");
-        return;
-    }
-
-    QXmlStreamReader xmlReader(&file);
+    // Salvar as informações iniciais no XML de forma segura com QSaveFile
+    QString filePath = "\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\3. DADOS\\dados.xml";
     QString xmlContent;
-
-    // Verificar se o arquivo já contém conteúdo
-    if (file.size() > 0)
-    {
-        // Ler o conteúdo existente
-        xmlContent = file.readAll();
-        file.resize(0);  // Esvazia o arquivo para escrever novamente
-    }
-    else
-    {
-        // Iniciar o arquivo XML se estiver vazio
+    QFile existing(filePath);
+    if (existing.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        xmlContent = existing.readAll();
+        existing.close();
+    } else {
         xmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Dados>\n</Dados>";
     }
 
-    file.close();
+    int pos = xmlContent.lastIndexOf("</Dados>");
+    if (pos != -1) {
+        xmlContent.insert(pos, QString("<Entrada><Pedido>%1</Pedido><Operador>%2</Operador><Maquina>%3</Maquina><ChapaRetalho>%4</ChapaRetalho><Saida>%5</Saida><Tipo>%6</Tipo><DataHoraInicio>%7</DataHoraInicio></Entrada>\n")
+                          .arg(Pedido)
+                          .arg(Operador)
+                          .arg(Maquina)
+                          .arg(Retalho)
+                          .arg(Saida)
+                          .arg(Tipo)
+                          .arg(dataHoraInicio));
+    }
 
-    // Reabrir o arquivo para escrita
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
-    {
+    QSaveFile saveFile(filePath);
+    if (!saveFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QMessageBox::warning(this, "Erro", "Não foi possível abrir o arquivo XML para escrita");
         return;
     }
-
-    // Posicionar o ponteiro do arquivo antes da tag de fechamento </Dados>
-    int pos = xmlContent.lastIndexOf("</Dados>");
-    if (pos != -1)
-    {
-        xmlContent.insert(pos, QString("<Entrada><Pedido>%1</Pedido><Operador>%2</Operador><Maquina>%3</Maquina><ChapaRetalho>%4</ChapaRetalho><Saida>%5</Saida><Tipo>%6</Tipo><DataHoraInicio>%7</DataHoraInicio></Entrada>\n")
-                              .arg(Pedido)
-                              .arg(Operador)
-                              .arg(Maquina)
-                              .arg(Retalho)
-                              .arg(Saida)
-                              .arg(Tipo)
-                              .arg(dataHoraInicio));
+    QTextStream out(&saveFile);
+    out << xmlContent;
+    if (!saveFile.commit()) {
+        QMessageBox::warning(this, "Erro", "Falha ao gravar o arquivo XML (commit falhou)");
+        return;
     }
-
-    // Escrever o conteúdo atualizado de volta no arquivo
-    QTextStream stream(&file);
-    stream << xmlContent;
 
 
 
@@ -241,30 +299,41 @@ void MainWindow::on_pushButtonFinalizar_clicked()
     // Obter o tempo total decorrido
     QString tempoDecorrido = time.toString("hh:mm:ss");
 
-    // Atualizar as informações de finalização no XML
-    QFile file("\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\3. DADOS\\dados.xml");
-    if (!file.open(QIODevice::ReadWrite | QIODevice::Text))
+    // Atualizar as informações de finalização no XML usando QSaveFile
     {
-        QMessageBox::warning(this, "Erro", "Não foi possível abrir o arquivo XML");
-        return;
-    }
+        QString filePath = "\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\3. DADOS\\dados.xml";
+        QFile existing(filePath);
+        QString xmlContent;
+        if (existing.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            xmlContent = existing.readAll();
+            existing.close();
+        } else {
+            QMessageBox::warning(this, "Erro", "Não foi possível abrir o arquivo XML");
+            return;
+        }
 
-    QString xmlContent = file.readAll();
-    file.resize(0);  // Esvazia o arquivo para escrever novamente
+        int pos = xmlContent.lastIndexOf("<Pedido>" + Pedido + "</Pedido>");
+        if (pos != -1) {
+            int endPos = xmlContent.indexOf("</Entrada>", pos);
+            if (endPos != -1) {
+                xmlContent.insert(endPos, QString("<DataHoraTermino>%1</DataHoraTermino><TempoDecorrido>%2</TempoDecorrido>")
+                                      .arg(dataHoraTermino)
+                                      .arg(tempoDecorrido));
+            }
+        }
 
-    int pos = xmlContent.lastIndexOf("<Pedido>" + Pedido + "</Pedido>");
-    if (pos != -1) {
-        int endPos = xmlContent.indexOf("</Entrada>", pos);
-        if (endPos != -1) {
-            xmlContent.insert(endPos, QString("<DataHoraTermino>%1</DataHoraTermino><TempoDecorrido>%2</TempoDecorrido>")
-                                  .arg(dataHoraTermino)
-                                  .arg(tempoDecorrido));
+        QSaveFile saveFile(filePath);
+        if (!saveFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, "Erro", "Não foi possível abrir o arquivo XML para escrita");
+            return;
+        }
+        QTextStream out(&saveFile);
+        out << xmlContent;
+        if (!saveFile.commit()) {
+            QMessageBox::warning(this, "Erro", "Falha ao gravar o arquivo XML (commit falhou)");
+            return;
         }
     }
-
-    // Escrever o conteúdo atualizado de volta no arquivo
-    QTextStream stream(&file);
-    stream << xmlContent;
 
 
 
@@ -308,36 +377,59 @@ void MainWindow::on_pushButtonAbrirPDF_clicked()
     QString pdfFileName = saida.split("_S").first() + ".pdf";
     QString searchPath = "\\\\servidor\\PRODUCAO\\4. PLANO DE CORTE\\";
 
-    QDir dir(searchPath);
-    QStringList filters;
-    filters << pdfFileName;
-    dir.setNameFilters(filters);
-    dir.setFilter(QDir::Files | QDir::NoSymLinks | QDir::AllDirs);
+    // Inicia busca assíncrona do PDF (recursiva) com cancelamento/progresso
+    searchCanceled.store(false);
+    searchProgress.store(0);
+    searchTotal.store(0);
+    progressDialog->setLabelText("Buscando PDF...");
+    progressDialog->setMaximum(0);
+    progressDialog->show();
+    progressPoller->start();
 
-    QFileInfoList entries = dir.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Files, QDir::Name);
-    bool fileFound = false;
+    QFuture<QString> future = QtConcurrent::run([=]{ return this->performSearchPdf(pdfFileName, searchPath); });
+    pdfWatcher->setFuture(future);
+}
 
-    // Função recursiva para buscar o arquivo PDF
-    std::function<void(const QString &)> searchRecursively = [&](const QString &path) {
+QString MainWindow::performSearchPdf(const QString &pdfFileName, const QString &searchPath)
+{
+    QString foundPath;
+    QStringList stack;
+    stack << searchPath;
+
+    while (!stack.isEmpty() && !searchCanceled.load()) {
+        QString path = stack.takeLast();
         QDir directory(path);
         QFileInfoList list = directory.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Files, QDir::Name);
-        foreach (const QFileInfo &info, list) {
-            if (info.isFile() && info.fileName() == pdfFileName) {
-                QString pdfFilePath = info.absoluteFilePath();
-                QDesktopServices::openUrl(QUrl::fromLocalFile(pdfFilePath));
-                fileFound = true;
-                return;
+        for (const QFileInfo &info : list) {
+            if (searchCanceled.load()) break;
+            if (info.isFile()) {
+                searchProgress.fetch_add(1);
+                if (info.fileName() == pdfFileName) {
+                    foundPath = info.absoluteFilePath();
+                    return foundPath;
+                }
             } else if (info.isDir()) {
-                searchRecursively(info.absoluteFilePath());
-                if (fileFound) return;
+                stack << info.absoluteFilePath();
             }
         }
-    };
+    }
 
-    searchRecursively(searchPath);
+    return QString();
+}
 
-    if (!fileFound) {
-        QMessageBox::warning(this, "Erro", "Arquivo PDF correspondente não encontrado.");
+void MainWindow::onPdfSearchFinished()
+{
+    progressPoller->stop();
+    progressDialog->hide();
+    QString result = pdfWatcher->result();
+    if (result.isEmpty()) {
+        if (searchCanceled.load()) {
+            QMessageBox::information(this, "Aviso", "Busca cancelada.");
+        } else {
+            QMessageBox::warning(this, "Erro", "Arquivo PDF correspondente não encontrado.");
+        }
+    } else {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(result));
     }
 }
 
