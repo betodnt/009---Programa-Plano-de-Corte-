@@ -72,7 +72,7 @@ ControleCorteDobra_autogen/timestamp: C:/Qt/6.10.2/mingw_64/bin/moc.exe
 ControleCorteDobra_autogen/timestamp: C:/Qt/6.10.2/mingw_64/bin/uic.exe
 ControleCorteDobra_autogen/timestamp: CMakeFiles/ControleCorteDobra.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir="C:\Users\pcp-05\Desktop\009 - Programa Plano de Corte\build_mingw\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_1) "Automatic MOC and UIC for target ControleCorteDobra"
-	"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/ControleCorteDobra_autogen.dir/AutogenInfo.json" ""
+	"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/ControleCorteDobra_autogen.dir/AutogenInfo.json" Debug
 	"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/ControleCorteDobra_autogen/timestamp"
 
 CMakeFiles/ControleCorteDobra.dir/codegen:

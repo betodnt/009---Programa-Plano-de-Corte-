@@ -2,6 +2,7 @@
 C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mmc:Q_OBJECT
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/QElapsedTimer
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/QFutureWatcher
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/QTimer
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/q17memory.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/q20functional.h
@@ -47,12 +48,17 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qelapsedtimer.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qendian.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qeventloop.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qexception.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qexceptionhandling.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qflags.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfloat16.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qforeach.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfunctionaltools_impl.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfunctionpointer.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture_impl.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfutureinterface.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qfuturewatcher.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qgenericatomic.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qglobal.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qglobalstatic.h
@@ -74,6 +80,7 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qmetacontainer.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qmetatype.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qminmax.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qmutex.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qnamespace.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qnumeric.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qobject.h
@@ -84,9 +91,12 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qpair.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qpoint.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qprocessordetection.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qpromise.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qrect.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qrefcount.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qregularexpression.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qresultstore.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qrunnable.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qscopedpointer.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qscopeguard.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qset.h
@@ -122,11 +132,14 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtenvironmentvariables.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtextstream.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtformat_impl.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qthread.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qthreadpool.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtimer.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtmetamacros.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtnoop.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtpreprocessorsupport.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtresource.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtsan_impl.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qttranslation.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qttypetraits.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtCore/qtversion.h
@@ -171,11 +184,14 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtGui/qwindowdefs_win.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/QLabel
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/QMainWindow
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/QProgressDialog
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/QSpinBox
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qabstractspinbox.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qdialog.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qframe.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qlabel.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qmainwindow.h
+ mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qprogressdialog.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qsizepolicy.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qspinbox.h
  mdp:C:/Qt/6.10.2/mingw_64/include/QtWidgets/qtabwidget.h
@@ -195,6 +211,7 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/allocated_ptr.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/allocator.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_base.h
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_futex.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_lockfree_defines.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/basic_string.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/basic_string.tcc
@@ -241,6 +258,8 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/specfun.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_abs.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_function.h
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_mutex.h
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_thread.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_algo.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_algobase.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stl_bvector.h
@@ -269,6 +288,7 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/string_view.tcc
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/stringfwd.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/uniform_int_dist.h
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/unique_lock.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/unique_ptr.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/unordered_map.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/unordered_set.h
@@ -284,6 +304,7 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/clocale
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cmath
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/compare
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/condition_variable
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cstddef
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cstdint
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/cstdio
@@ -302,6 +323,7 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ext/string_conversions.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/ext/type_traits.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/functional
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/future
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/initializer_list
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/iosfwd
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/iterator
@@ -309,6 +331,7 @@ C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.h
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/list
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/map
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/memory
+ mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/mutex
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/new
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/numeric
  mdp:C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/optional

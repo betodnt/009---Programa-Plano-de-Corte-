@@ -44,6 +44,15 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "",
         "searchFiles",
         "pedido",
+        "performSearchFiles",
+        "tipo",
+        "performSearchPdf",
+        "pdfFileName",
+        "searchPath",
+        "onSearchFinished",
+        "onPdfSearchFinished",
+        "onCancelSearch",
+        "onProgressTimeout",
         "on_pushButtonIniciar_clicked",
         "on_pushButtonFinalizar_clicked",
         "on_pushButtonAbrirPDF_clicked",
@@ -57,14 +66,30 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         QtMocHelpers::SlotData<void(const QString &)>(3, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { QMetaType::QString, 4 },
         }}),
+        // Slot 'performSearchFiles'
+        QtMocHelpers::SlotData<QStringList(const QString &, const QString &)>(5, 2, QMC::AccessPrivate, QMetaType::QStringList, {{
+            { QMetaType::QString, 4 }, { QMetaType::QString, 6 },
+        }}),
+        // Slot 'performSearchPdf'
+        QtMocHelpers::SlotData<QString(const QString &, const QString &)>(7, 2, QMC::AccessPrivate, QMetaType::QString, {{
+            { QMetaType::QString, 8 }, { QMetaType::QString, 9 },
+        }}),
+        // Slot 'onSearchFinished'
+        QtMocHelpers::SlotData<void()>(10, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onPdfSearchFinished'
+        QtMocHelpers::SlotData<void()>(11, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onCancelSearch'
+        QtMocHelpers::SlotData<void()>(12, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onProgressTimeout'
+        QtMocHelpers::SlotData<void()>(13, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'on_pushButtonIniciar_clicked'
-        QtMocHelpers::SlotData<void()>(5, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(14, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'on_pushButtonFinalizar_clicked'
-        QtMocHelpers::SlotData<void()>(6, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(15, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'on_pushButtonAbrirPDF_clicked'
-        QtMocHelpers::SlotData<void()>(7, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(16, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'updateTimerDisplay'
-        QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(17, 2, QMC::AccessPrivate, QMetaType::Void),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -90,10 +115,18 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         switch (_id) {
         case 0: _t->on_linePedido_editingFinished(); break;
         case 1: _t->searchFiles((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
-        case 2: _t->on_pushButtonIniciar_clicked(); break;
-        case 3: _t->on_pushButtonFinalizar_clicked(); break;
-        case 4: _t->on_pushButtonAbrirPDF_clicked(); break;
-        case 5: _t->updateTimerDisplay(); break;
+        case 2: { QStringList _r = _t->performSearchFiles((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2])));
+            if (_a[0]) *reinterpret_cast<QStringList*>(_a[0]) = std::move(_r); }  break;
+        case 3: { QString _r = _t->performSearchPdf((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2])));
+            if (_a[0]) *reinterpret_cast<QString*>(_a[0]) = std::move(_r); }  break;
+        case 4: _t->onSearchFinished(); break;
+        case 5: _t->onPdfSearchFinished(); break;
+        case 6: _t->onCancelSearch(); break;
+        case 7: _t->onProgressTimeout(); break;
+        case 8: _t->on_pushButtonIniciar_clicked(); break;
+        case 9: _t->on_pushButtonFinalizar_clicked(); break;
+        case 10: _t->on_pushButtonAbrirPDF_clicked(); break;
+        case 11: _t->updateTimerDisplay(); break;
         default: ;
         }
     }
@@ -118,14 +151,14 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 6)
+        if (_id < 12)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 6;
+        _id -= 12;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 6)
+        if (_id < 12)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 6;
+        _id -= 12;
     }
     return _id;
 }

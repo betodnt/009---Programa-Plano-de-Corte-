@@ -407,6 +407,29 @@ CMakeFiles/ControleCorteDobra.dir/ControleCorteDobra_autogen/mocs_compilation.cp
  C:/Qt/6.10.2/mingw_64/include/QtGui/qvalidator.h \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qregularexpression.h \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qlocale.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/QFutureWatcher \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuturewatcher.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfutureinterface.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qmutex.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qtsan_impl.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qresultstore.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture_impl.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qthreadpool.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qthread.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/future \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/mutex \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_mutex.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/unique_lock.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/condition_variable \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_futex.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_thread.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qrunnable.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qexception.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qpromise.h \
+ C:/Qt/6.10.2/mingw_64/include/QtWidgets/QProgressDialog \
+ C:/Qt/6.10.2/mingw_64/include/QtWidgets/qprogressdialog.h \
+ C:/Qt/6.10.2/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.10.2/mingw_64/include/QtGui/qtextcursor.h \
  C:/Qt/6.10.2/mingw_64/include/QtGui/qtextformat.h \
  C:/Qt/6.10.2/mingw_64/include/QtGui/qpen.h \

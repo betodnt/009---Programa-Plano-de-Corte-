@@ -28,6 +28,7 @@ private slots:
     void on_linePedido_editingFinished();
     void searchFiles(const QString &pedido);
     QStringList performSearchFiles(const QString &pedido, const QString &tipo);
+    QString performSearchPdf(const QString &pdfFileName, const QString &searchPath);
     void onSearchFinished();
     void onPdfSearchFinished();
     void onCancelSearch();
@@ -45,11 +46,19 @@ private:
     QLabel *labelTimer;           // QLabel para exibir o tempo
     QFutureWatcher<QStringList> *searchWatcher;
     QFutureWatcher<QString> *pdfWatcher;
+    QFutureWatcher<QString> *fileOpWatcher;
     QProgressDialog *progressDialog;
     QTimer *progressPoller;
     std::atomic_bool searchCanceled;
     std::atomic_int searchProgress;
     std::atomic_int searchTotal;
+    std::atomic_int fileOpProgress;
+    std::atomic_int fileOpTotal;
+    enum FileOpType { NoneOp, CopyOp, MoveOp } fileOpType;
+
+    QString performFileCopy(const QString &srcPath, const QString &dstPath);
+    QString performFileMove(const QString &srcPath, const QString &dstPath);
+    void onFileOpFinished();
 };
 
 #endif // MAINWINDOW_H

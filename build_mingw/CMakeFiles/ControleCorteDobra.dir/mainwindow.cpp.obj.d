@@ -406,6 +406,29 @@ CMakeFiles/ControleCorteDobra.dir/mainwindow.cpp.obj: \
  C:/Qt/6.10.2/mingw_64/include/QtGui/qvalidator.h \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qregularexpression.h \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qlocale.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/QFutureWatcher \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuturewatcher.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfutureinterface.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qmutex.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qtsan_impl.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qresultstore.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture_impl.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qthreadpool.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qthread.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/future \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/mutex \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_mutex.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/unique_lock.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/condition_variable \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/atomic_futex.h \
+ C:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/bits/std_thread.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qrunnable.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qexception.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qpromise.h \
+ C:/Qt/6.10.2/mingw_64/include/QtWidgets/QProgressDialog \
+ C:/Qt/6.10.2/mingw_64/include/QtWidgets/qprogressdialog.h \
+ C:/Qt/6.10.2/mingw_64/include/QtWidgets/qdialog.h \
  C:/Users/pcp-05/Desktop/009-PR~1/BUILD_~1/CONTRO~1/include/ui_mainwindow.h \
  C:/Qt/6.10.2/mingw_64/include/QtCore/QVariant \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qvariant.h \
@@ -481,7 +504,6 @@ CMakeFiles/ControleCorteDobra.dir/mainwindow.cpp.obj: \
  C:/Qt/6.10.2/mingw_64/include/QtCore/QXmlStreamReader \
  C:/Qt/6.10.2/mingw_64/include/QtWidgets/QMessageBox \
  C:/Qt/6.10.2/mingw_64/include/QtWidgets/qmessagebox.h \
- C:/Qt/6.10.2/mingw_64/include/QtWidgets/qdialog.h \
  C:/Qt/6.10.2/mingw_64/include/QtWidgets/qdialogbuttonbox.h \
  C:/Qt/6.10.2/mingw_64/include/QtCore/QDateTime \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qdatetime.h \
@@ -497,4 +519,15 @@ CMakeFiles/ControleCorteDobra.dir/mainwindow.cpp.obj: \
  C:/Qt/6.10.2/mingw_64/include/QtCore/QFileInfo \
  C:/Qt/6.10.2/mingw_64/include/QtCore/qfileinfo.h \
  C:/Qt/6.10.2/mingw_64/include/QtGui/QDesktopServices \
- C:/Qt/6.10.2/mingw_64/include/QtGui/qdesktopservices.h
+ C:/Qt/6.10.2/mingw_64/include/QtGui/qdesktopservices.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/QSaveFile \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qsavefile.h \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/QtConcurrentRun \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/qtconcurrentrun.h \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/qtconcurrentcompilertest.h \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/qtconcurrent_global.h \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/qtconcurrentexports.h \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/qtconcurrentrunbase.h \
+ C:/Qt/6.10.2/mingw_64/include/QtConcurrent/qtconcurrentstoredfunctioncall.h \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/QFuture \
+ C:/Qt/6.10.2/mingw_64/include/QtCore/qfuture.h

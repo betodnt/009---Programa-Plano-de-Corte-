@@ -36,6 +36,9 @@ MainWindow::MainWindow(QWidget *parent)
     // watcher para busca recursiva de PDF
     pdfWatcher = new QFutureWatcher<QString>(this);
     connect(pdfWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onPdfSearchFinished);
+    // watcher para operações de arquivo (copy/move)
+    fileOpWatcher = new QFutureWatcher<QString>(this);
+    connect(fileOpWatcher, &QFutureWatcher<QString>::finished, this, &MainWindow::onFileOpFinished);
 
     progressPoller = new QTimer(this);
     progressPoller->setInterval(200);
@@ -44,6 +47,9 @@ MainWindow::MainWindow(QWidget *parent)
     searchCanceled.store(false);
     searchProgress.store(0);
     searchTotal.store(0);
+    fileOpProgress.store(0);
+    fileOpTotal.store(0);
+    fileOpType = NoneOp;
 
     labelTimer = ui->labelTimer;
     labelTimer->setText("00:00:00");
@@ -177,6 +183,63 @@ void MainWindow::onSearchFinished()
     }
 }
 
+// Implementação de copia de arquivo com progresso (chunked) e escrita atômica
+QString MainWindow::performFileCopy(const QString &srcPath, const QString &dstPath)
+{
+    QFile src(srcPath);
+    if (!src.open(QIODevice::ReadOnly)) {
+        return QString("Falha ao abrir arquivo de origem: %1").arg(srcPath);
+    }
+
+    qint64 total = src.size();
+    fileOpTotal.store((int)qMin<qint64>(INT_MAX, total));
+    fileOpProgress.store(0);
+
+    QSaveFile dst(dstPath);
+    if (!dst.open(QIODevice::WriteOnly)) {
+        src.close();
+        return QString("Falha ao abrir arquivo destino: %1").arg(dstPath);
+    }
+
+    const qint64 chunkSize = 64 * 1024;
+    QByteArray buffer;
+    while (!src.atEnd() && !searchCanceled.load()) {
+        buffer = src.read(chunkSize);
+        qint64 written = dst.write(buffer);
+        if (written != buffer.size()) {
+            dst.cancelWriting();
+            src.close();
+            return QString("Erro durante a escrita do arquivo destino");
+        }
+        fileOpProgress.fetch_add((int)buffer.size());
+    }
+
+    src.close();
+    if (searchCanceled.load()) {
+        dst.cancelWriting();
+        return QString("Operação cancelada");
+    }
+
+    if (!dst.commit()) {
+        return QString("Falha ao confirmar escrita do arquivo destino");
+    }
+
+    return QString(); // sucesso (string vazia)
+}
+
+QString MainWindow::performFileMove(const QString &srcPath, const QString &dstPath)
+{
+    // Tenta rename simples primeiro
+    if (QFile::rename(srcPath, dstPath)) {
+        return QString();
+    }
+    // Caso rename falhe (cross-filesystem), faz copy e remove
+    QString err = performFileCopy(srcPath, dstPath);
+    if (!err.isEmpty()) return err;
+    if (!QFile::remove(srcPath)) return QString("Arquivo copiado, mas falha ao remover origem");
+    return QString();
+}
+
 void MainWindow::onCancelSearch()
 {
     searchCanceled.store(true);
@@ -202,7 +265,7 @@ void MainWindow::onProgressTimeout()
 void MainWindow::on_pushButtonIniciar_clicked()
 {
     // Iniciar o timer
-    elapsedTimer->start();
+    elapsedTimer.start();
     timer->start(1000);
 
     // Desabilitar os campos para edição e habilitar o botão de finalizar
@@ -260,21 +323,28 @@ void MainWindow::on_pushButtonIniciar_clicked()
 
 
 
-    // Mover o arquivo selecionado na QComboBox para a pasta Saídas Selecionadas
+    // Iniciar cópia assíncrona do arquivo selecionado para Saídas Selecionadas
     QString selectedFile = ui->comboBox->currentText();
     if (!selectedFile.isEmpty()) {
         QString sourcePath = "\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\1. SAÍDAS A CORTAR\\" + selectedFile;
         QString destinationPath = "\\\\servidor\\PRODUCAO\\1. SAÍDAS CNC\\" + selectedFile;
 
+        // remove destino se existir (cooperativo: faça na thread para evitar race)
         if (QFile::exists(destinationPath)) {
-            QFile::remove(destinationPath); // Remove o arquivo existente se houver
-        }
-        if (QFile::copy(sourcePath, destinationPath)) {
-            QMessageBox::information(this, "Sucesso", "Plano iniciado com sucesso!");
-        } else {
-            QMessageBox::warning(this, "Erro", "Não foi possível mover o arquivo.");
+            QFile::remove(destinationPath);
         }
 
+        // Preparar e iniciar operação assíncrona de cópia
+        fileOpType = CopyOp;
+        searchCanceled.store(false);
+        fileOpProgress.store(0);
+        fileOpTotal.store(0);
+        progressDialog->setLabelText("Copiando arquivo...");
+        progressDialog->setMaximum(0);
+        progressDialog->show();
+        progressPoller->start();
+        QFuture<QString> future = QtConcurrent::run([=]{ return this->performFileCopy(sourcePath, destinationPath); });
+        fileOpWatcher->setFuture(future);
     }
 }
 
@@ -284,7 +354,7 @@ void MainWindow::on_pushButtonFinalizar_clicked()
     timer->stop();
 
     // Calcular o tempo decorrido final
-    qint64 elapsed = elapsedTimer->elapsed();
+    qint64 elapsed = elapsedTimer.elapsed();
     QTime time(0, 0, 0);
     time = time.addMSecs(elapsed);
     labelTimer->setText(time.toString("hh:mm:ss"));  // Exibir o tempo decorrido final no label
@@ -345,11 +415,18 @@ void MainWindow::on_pushButtonFinalizar_clicked()
         if (QFile::exists(destinationPath)) {
             QFile::remove(destinationPath); // Remove o arquivo existente se houver
         }
-        if (QFile::rename(sourcePath, destinationPath)) {
-            QMessageBox::information(this, "Sucesso", "Plano finalizado com sucesso!");
-        } else {
-            QMessageBox::warning(this, "Erro", "Não foi possível mover o arquivo.");
-        }
+
+        // Iniciar movimento assíncrono (rename ou copy+remove)
+        fileOpType = MoveOp;
+        searchCanceled.store(false);
+        fileOpProgress.store(0);
+        fileOpTotal.store(0);
+        progressDialog->setLabelText("Movendo arquivo...");
+        progressDialog->setMaximum(0);
+        progressDialog->show();
+        progressPoller->start();
+        QFuture<QString> future = QtConcurrent::run([=]{ return this->performFileMove(sourcePath, destinationPath); });
+        fileOpWatcher->setFuture(future);
 
     }
 
@@ -431,5 +508,28 @@ void MainWindow::onPdfSearchFinished()
     } else {
         QDesktopServices::openUrl(QUrl::fromLocalFile(result));
     }
+}
+
+void MainWindow::onFileOpFinished()
+{
+    progressPoller->stop();
+    progressDialog->hide();
+    QString err = fileOpWatcher->result();
+    // Reativar campos
+    ui->linePedido->setEnabled(true);
+    ui->lineOperador->setEnabled(true);
+    ui->cbox_Maquina->setEnabled(true);
+    ui->cbox_Retalho->setEnabled(true);
+    ui->comboBox->setEnabled(true);
+    ui->pushButtonIniciar->setEnabled(true);
+    ui->pushButtonFinalizar->setEnabled(false);
+
+    if (!err.isEmpty()) {
+        QMessageBox::warning(this, "Erro", err);
+    } else {
+        if (fileOpType == CopyOp) QMessageBox::information(this, "Sucesso", "Plano iniciado com sucesso!");
+        else if (fileOpType == MoveOp) QMessageBox::information(this, "Sucesso", "Plano finalizado com sucesso!");
+    }
+    fileOpType = NoneOp;
 }
 

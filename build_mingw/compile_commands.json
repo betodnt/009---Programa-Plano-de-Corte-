@@ -1,0 +1,20 @@
+[
+{
+  "directory": "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw",
+  "command": "C:\\Qt\\Tools\\mingw1310_64\\bin\\c++.exe -DMINGW_HAS_SECURE_API=1 -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NEEDS_QMAIN -DQT_WIDGETS_LIB -DUNICODE -DWIN32 -DWIN64 -D_ENABLE_EXTENDED_ALIGNED_STORAGE -D_UNICODE -D_WIN64 @CMakeFiles/ControleCorteDobra.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ControleCorteDobra.dir\\ControleCorteDobra_autogen\\mocs_compilation.cpp.obj -c \"C:\\Users\\pcp-05\\Desktop\\009 - Programa Plano de Corte\\build_mingw\\ControleCorteDobra_autogen\\mocs_compilation.cpp\"",
+  "file": "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/ControleCorteDobra_autogen/mocs_compilation.cpp",
+  "output": "CMakeFiles/ControleCorteDobra.dir/ControleCorteDobra_autogen/mocs_compilation.cpp.obj"
+},
+{
+  "directory": "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw",
+  "command": "C:\\Qt\\Tools\\mingw1310_64\\bin\\c++.exe -DMINGW_HAS_SECURE_API=1 -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NEEDS_QMAIN -DQT_WIDGETS_LIB -DUNICODE -DWIN32 -DWIN64 -D_ENABLE_EXTENDED_ALIGNED_STORAGE -D_UNICODE -D_WIN64 @CMakeFiles/ControleCorteDobra.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ControleCorteDobra.dir\\main.cpp.obj -c \"C:\\Users\\pcp-05\\Desktop\\009 - Programa Plano de Corte\\main.cpp\"",
+  "file": "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/main.cpp",
+  "output": "CMakeFiles/ControleCorteDobra.dir/main.cpp.obj"
+},
+{
+  "directory": "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw",
+  "command": "C:\\Qt\\Tools\\mingw1310_64\\bin\\c++.exe -DMINGW_HAS_SECURE_API=1 -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NEEDS_QMAIN -DQT_WIDGETS_LIB -DUNICODE -DWIN32 -DWIN64 -D_ENABLE_EXTENDED_ALIGNED_STORAGE -D_UNICODE -D_WIN64 @CMakeFiles/ControleCorteDobra.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ControleCorteDobra.dir\\mainwindow.cpp.obj -c \"C:\\Users\\pcp-05\\Desktop\\009 - Programa Plano de Corte\\mainwindow.cpp\"",
+  "file": "C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/mainwindow.cpp",
+  "output": "CMakeFiles/ControleCorteDobra.dir/mainwindow.cpp.obj"
+}
+]
