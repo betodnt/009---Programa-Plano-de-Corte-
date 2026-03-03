@@ -121,7 +121,7 @@ void MainWindow::searchFiles(const QString &pedido)
 QStringList MainWindow::performSearchFiles(const QString &pedido, const QString &tipo)
 {
     QStringList results;
-    QDir dir("\\\\servidor\\PRODUCAO\\8. CONTROLE DE PRODUÇÃO\\1. SAÍDAS A CORTAR");
+    QDir dir("x:\1. ACERVO PRODUTIVO\1. SAÍDAS CNC");
     QStringList filters;
     filters << "*.cnc";
     dir.setNameFilters(filters);
