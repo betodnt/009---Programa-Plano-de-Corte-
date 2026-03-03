@@ -9,8 +9,16 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
+# Locate Qt6 (or fallback to Qt5 if needed).
+# The original generic "QT" package caused a version compatibility error when
+# CMake found Qt 6.10.2.  Requesting the specific Qt6 package directly avoids
+# the empty-version check and makes the configuration reliable.
+#
+# Use an exact version match to avoid the mysterious "requested version \"\""
+# error.  Matching the installed Qt release should succeed.
+find_package(Qt6 6.10.2 EXACT REQUIRED COMPONENTS Widgets LinguistTools)
+# equivalent for Qt5 would be:
+# find_package(Qt5 COMPONENTS Widgets LinguistTools)
 
 set(TS_FILES ControleCorteDobra_pt_BR.ts)
 

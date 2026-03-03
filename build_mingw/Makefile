@@ -117,18 +117,6 @@ install/local/fast: preinstall/fast
 	"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
 .PHONY : install/local/fast
 
-# Special rule for the target install/strip
-install/strip: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Installing the project stripped..."
-	"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip
-
-# Special rule for the target install/strip
-install/strip/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Installing the project stripped..."
-	"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip/fast
-
 # The main all target
 all: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start "C:\Users\pcp-05\Desktop\009 - Programa Plano de Corte\build_mingw\CMakeFiles" "C:\Users\pcp-05\Desktop\009 - Programa Plano de Corte\build_mingw\\CMakeFiles\progress.marks"
@@ -281,7 +269,6 @@ help:
 	@echo ... edit_cache
 	@echo ... install
 	@echo ... install/local
-	@echo ... install/strip
 	@echo ... list_install_components
 	@echo ... rebuild_cache
 	@echo ... ControleCorteDobra_autogen
