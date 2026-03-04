@@ -57,13 +57,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->linePedido, &QLineEdit::editingFinished, this, &MainWindow::on_linePedido_editingFinished);
     connect(timer, &QTimer::timeout, this, &MainWindow::updateTimerDisplay);
 
-    // Conectar a mudança de tipo à função de pesquisa
-    connect(ui->cbox_Tipo, QOverload<int>::of(&QComboBox::currentIndexChanged), [this]() {
-        QString pedido = ui->linePedido->text();
-        if (!pedido.isEmpty()) {
-            searchFiles(pedido);
-        }
-    });
+    // Nota: Não conectamos mudanças de tipo a busca automática, pois elas disparam ao inicializar
+    // A busca ocorre apenas quando o usuário termina de editar o campo "Pedido"
 
     ui->pushButtonFinalizar->setEnabled(false);
 }

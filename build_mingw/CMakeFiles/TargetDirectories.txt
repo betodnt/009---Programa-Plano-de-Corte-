@@ -1,0 +1,8 @@
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/ControleCorteDobra.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/edit_cache.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/rebuild_cache.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/list_install_components.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/install.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/install/local.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/ControleCorteDobra_autogen_timestamp_deps.dir
+C:/Users/pcp-05/Desktop/009 - Programa Plano de Corte/build_mingw/CMakeFiles/ControleCorteDobra_autogen.dir

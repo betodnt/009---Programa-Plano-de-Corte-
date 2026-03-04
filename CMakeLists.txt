@@ -64,16 +64,11 @@ qt_add_executable(ControleCorteDobra
 
 qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 
-target_link_libraries(ControleCorteDobra PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+# Link only to Qt6::Widgets since we are building Qt6-only
+target_link_libraries(ControleCorteDobra PRIVATE Qt6::Widgets)
 
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
-if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.ControleCorteDobra)
-endif()
+# Set target properties for Windows GUI application
 set_target_properties(ControleCorteDobra PROPERTIES
-    ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
@@ -87,6 +82,4 @@ install(TARGETS ControleCorteDobra
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(ControleCorteDobra)
-endif()
+qt_finalize_executable(ControleCorteDobra)
