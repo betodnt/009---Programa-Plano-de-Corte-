@@ -2,6 +2,15 @@ cmake_minimum_required(VERSION 3.16)
 
 project(ControleCorteDobra VERSION 0.1 LANGUAGES CXX)
 
+# Ensure CMake can find the Qt6 installation – overrideable by user.
+if(NOT DEFINED Qt6_DIR)
+    # hard-coded to the known installed Qt version on this machine
+    set(Qt6_DIR "C:/Qt/6.10.2/mingw_64/lib/cmake/Qt6" CACHE PATH "Qt6 CMake directory")
+endif()
+
+# Add Qt to prefix path in case some modules look there directly
+list(APPEND CMAKE_PREFIX_PATH "${Qt6_DIR}")
+
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -14,9 +23,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # CMake found Qt 6.10.2.  Requesting the specific Qt6 package directly avoids
 # the empty-version check and makes the configuration reliable.
 #
-# Use an exact version match to avoid the mysterious "requested version \"\""
-# error.  Matching the installed Qt release should succeed.
-find_package(Qt6 6.10.2 EXACT REQUIRED COMPONENTS Widgets LinguistTools)
+# The explicit version in the find_package call caused CMake to report
+# incompatibility due to the "(64bit)" suffix in Qt6Config.cmake.
+# Instead rely on the prefix path and allow any Qt6 6.x installation.
+#
+# Qt6Config may append "(64bit)" to the version string which breaks
+# CMake's standard version comparison logic.  We can simply disable the
+# check so that any Qt6 installation is accepted.
+set(QT_NO_PACKAGE_VERSION_CHECK TRUE CACHE BOOL "Disable Qt version compatibility check")
+
+# Ensure the version variable isn't empty; Qt's config file treats an
+# empty requested version as incompatible.  We only need a minimum bound.
+# keep this in cache so find_package sees it
+set(Qt6_FIND_VERSION "6.0" CACHE STRING "Minimum Qt6 version to locate" FORCE)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets LinguistTools)
 # equivalent for Qt5 would be:
 # find_package(Qt5 COMPONENTS Widgets LinguistTools)
 
@@ -30,32 +51,18 @@ set(PROJECT_SOURCES
         ${TS_FILES}
 )
 
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(ControleCorteDobra
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
-    )
+# We only support Qt6 in this project so configure the executable directly.
+qt_add_executable(ControleCorteDobra
+    MANUAL_FINALIZATION
+    ${PROJECT_SOURCES}
+)
+
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ControleCorteDobra APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
 #                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
 # For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
 
-    qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
-else()
-    if(ANDROID)
-        add_library(ControleCorteDobra SHARED
-            ${PROJECT_SOURCES}
-        )
-# Define properties for Android with Qt 5 after find_package() calls as:
-#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
-    else()
-        add_executable(ControleCorteDobra
-            ${PROJECT_SOURCES}
-        )
-    endif()
-
-    qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
-endif()
+qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 
 target_link_libraries(ControleCorteDobra PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
