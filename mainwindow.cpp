@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QComboBox>
 #include <QFileInfo>
+#include <QDirIterator>
 #include <QDesktopServices>
 #include <QElapsedTimer> // Incluir a classe para o timer
 #include <QLabel>
@@ -356,7 +357,6 @@ void MainWindow::on_pushButtonFinalizar_clicked()
 
     QString Pedido = ui->linePedido->text();
     QString selectedFile = ui->comboBox->currentText();
-    QString Tipo = ui->cbox_Tipo->currentData().toString(); // Tipo selecionado
 
     // Obtenha a data e hora atuais
     QString dataHoraTermino = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
@@ -464,28 +464,18 @@ void MainWindow::on_pushButtonAbrirPDF_clicked()
 
 QString MainWindow::performSearchPdf(const QString &pdfFileName, const QString &searchPath)
 {
-    QString foundPath;
-    QStringList stack;
-    stack << searchPath;
+    // QDirIterator sem filtros de nome para garantir que possamos incrementar o progresso em cada arquivo
+    QDirIterator it(searchPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        if (searchCanceled.load()) break;
 
-    while (!stack.isEmpty() && !searchCanceled.load()) {
-        QString path = stack.takeLast();
-        QDir directory(path);
-        QFileInfoList list = directory.entryInfoList(QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Files, QDir::Name);
-        for (const QFileInfo &info : list) {
-            if (searchCanceled.load()) break;
-            if (info.isFile()) {
-                searchProgress.fetch_add(1);
-                if (info.fileName() == pdfFileName) {
-                    foundPath = info.absoluteFilePath();
-                    return foundPath;
-                }
-            } else if (info.isDir()) {
-                stack << info.absoluteFilePath();
-            }
+        QString filePath = it.next();
+        searchProgress.fetch_add(1);
+
+        if (it.fileName() == pdfFileName) {
+            return filePath;
         }
     }
-
     return QString();
 }
 
