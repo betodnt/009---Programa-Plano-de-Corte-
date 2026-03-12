@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Dados>
+  <Entrada>
+    <Pedido>001</Pedido>
+    <Operador>roberto</Operador>
+    <Maquina>Bodor1 (12K)</Maquina>
+    <ChapaRetalho>Chapa Inteira</ChapaRetalho>
+    <Saida>P001_S01.cnc</Saida>
+    <Tipo>Pedido</Tipo>
+    <DataHoraInicio>2026-03-11 23:25:42</DataHoraInicio>
+    <DataHoraTermino>2026-03-11 23:26:41</DataHoraTermino>
+    <TempoDecorrido>00:00:59</TempoDecorrido>
+  </Entrada>
+  <Entrada>
+    <Pedido>001</Pedido>
+    <Operador>cardozo</Operador>
+    <Maquina>Bodor2 (6K)</Maquina>
+    <ChapaRetalho>Chapa Inteira</ChapaRetalho>
+    <Saida>A001_S02.cnc</Saida>
+    <Tipo>Avulso</Tipo>
+    <DataHoraInicio>2026-03-11 23:32:07</DataHoraInicio>
+    <DataHoraTermino>2026-03-11 23:32:26</DataHoraTermino>
+    <TempoDecorrido>00:00:19</TempoDecorrido>
+  </Entrada>
+<Entrada><Pedido>001</Pedido><Operador>joão</Operador><Maquina>Bodor1 (12K)</Maquina><ChapaRetalho>Chapa Inteira</ChapaRetalho><Saida>A001_S02.cnc</Saida><Tipo>Avulso</Tipo><DataHoraInicio>2026-03-11 23:41:31</DataHoraInicio><DataHoraTermino>2026-03-11 23:41:51</DataHoraTermino><TempoDecorrido>00:00:20</TempoDecorrido></Entrada><Entrada><Pedido>003</Pedido><Operador>Operador1</Operador><Maquina>Bodor1 (12K)</Maquina><Chapa>Chapa Inteira</Chapa><Saida>E003_S01.cnc</Saida><Tipo>Estoque</Tipo><DataHoraInicio>2026-03-11 23:45:07</DataHoraInicio><DataHoraTermino>2026-03-11 23:45:28</DataHoraTermino><TempoDecorrido>00:00:20</TempoDecorrido></Entrada></Dados>
