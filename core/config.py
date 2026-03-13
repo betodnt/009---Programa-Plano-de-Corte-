@@ -22,7 +22,7 @@ class ConfigManager:
             'SaidasCnc': './public/saidas_cnc',
             'SaidasCortadas': './public/saidas_cortadas',
             'PlanoCorte': './public/plano_corte',
-            'DadosXml': './public/dados/dados.xml'
+            'DadosXml': './public/dados/dados_{date}.xml' # Template placeholder
         }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
@@ -64,7 +64,19 @@ class ConfigManager:
 
     @staticmethod
     def get_k8_data_path():
-        return ConfigManager._get_path('DadosXml', './public/dados/dados.xml')
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        
+        # We want to force daily files, so we check if the config has a template or just use daily default
+        config_val = ConfigManager._get_path('DadosXml', '')
+        if config_val and '{date}' in config_val:
+            return config_val.replace('{date}', date_str)
+            
+        # If config has a static "dados.xml", we override it to be daily
+        if not config_val or config_val.endswith('dados.xml'):
+            return ConfigManager._resolve_path(f'./public/dados/dados_{date_str}.xml')
+            
+        return config_val
 
     @staticmethod
     def get_plano_corte_path():

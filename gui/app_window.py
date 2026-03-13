@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import webbrowser
 from datetime import datetime
+import xml.etree.ElementTree as ET
 
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -11,6 +12,7 @@ from core.file_ops import FileOperationRunner
 
 from gui.form_panel import FormPanel
 from gui.action_panel import ActionPanel
+from gui.history_panel import HistoryPanel
 
 class ProgressDialog(tk.Toplevel):
     def __init__(self, master, title="Aguarde...", max_val=0):
@@ -64,7 +66,7 @@ class AppWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Controle de Corte e Dobra")
-        self.geometry("800x500")
+        self.geometry("1000x550") # Increased width for the new panel
         
         ConfigManager.load_settings()
         
@@ -73,6 +75,9 @@ class AppWindow(tk.Tk):
         
         self.active_runner = None
         self.progress_win = None
+        
+        # Initial population of operator suggestions
+        self.after(500, self._refresh_recent_operators)
 
     def _setup_styles(self):
         style = ttk.Style(self)
@@ -88,50 +93,134 @@ class AppWindow(tk.Tk):
 
         # Configurações globais
         self.configure(bg=bg_dark)
-        style.theme_use('default') 
+        style.theme_use('clam') 
         
         # Estilo de Quadros (Frames)
         style.configure("TFrame", background=bg_dark)
         
         # Estilo de Labels
-        style.configure("TLabel", background=bg_dark, foreground="#e0e0e0", font=("Segoe UI", 12))
+        style.configure("TLabel", background=bg_dark, foreground="#e0e0e0", font=("Segoe UI", 11))
         
-        # Estilo de Campos de Entrada e Combobox
-        # Nota: Tkinter nativo tem limitações no arredondamento, mas cores funcionam bem
-        style.configure("TEntry", fieldbackground=bg_field, foreground=fg_white, insertcolor=fg_white)
-        style.configure("TCombobox", fieldbackground=bg_field, foreground=fg_white, arrowcolor=fg_white)
-        style.map("TCombobox", fieldbackground=[('readonly', bg_field)], foreground=[('readonly', fg_white)])
+        # Estilo de Campos de Entrada e Combobox (Refinado)
+        style.configure("TEntry", 
+            fieldbackground=bg_field, 
+            foreground=fg_white, 
+            insertcolor=fg_white,
+            borderwidth=1,
+            relief="flat",
+            padding=5
+        )
+        
+        style.configure("TCombobox", 
+            fieldbackground=bg_field, 
+            foreground=fg_white, 
+            background=bg_field,
+            arrowcolor=fg_white,
+            borderwidth=1,
+            relief="flat",
+            padding=4
+        )
+        style.map("TCombobox", 
+            fieldbackground=[('readonly', bg_field)], 
+            foreground=[('readonly', fg_white)],
+            lightcolor=[('focus', accent_blue)],
+            darkcolor=[('focus', accent_blue)]
+        )
 
-        # Botão Padrão (Azul)
-        style.configure("TButton", font=("Segoe UI", 10, "bold"), padding=5)
+        # Botão Padrão (Moderno e mais arredondado)
+        style.configure("TButton", 
+            font=("Segoe UI", 10, "bold"), 
+            padding=(20, 8), 
+            background=bg_field, 
+            foreground=fg_white, 
+            borderwidth=1, 
+            relief="flat"
+        )
+        style.map("TButton", 
+            background=[('active', "#4e5254")], 
+            foreground=[('active', fg_white)],
+            relief=[('pressed', 'groove'), ('!pressed', 'flat')]
+        )
         
-        # Estilo para os botões de ação (Iniciar/Finalizar)
-        style.configure("Action.TButton", font=("Segoe UI", 14, "bold"), padding=10)
+        # Botões de Ação (Mais robustos e suaves)
+        style.configure("Action.TButton", font=("Segoe UI", 12, "bold"), padding=(25, 12))
         
         # Iniciar (Verde)
-        style.configure("Iniciar.Action.TButton", background=accent_green, foreground="white")
+        style.configure("Iniciar.Action.TButton", background=accent_green, foreground="white", borderwidth=0)
         style.map("Iniciar.Action.TButton", background=[('active', "#2ecc71"), ('disabled', "#555555")])
         
         # Finalizar (Vermelho)
-        style.configure("Finalizar.Action.TButton", background=accent_red, foreground="white")
+        style.configure("Finalizar.Action.TButton", background=accent_red, foreground="white", borderwidth=0)
         style.map("Finalizar.Action.TButton", background=[('active', "#e74c3c"), ('disabled', "#555555")])
+
+        # Fim de Turno (Laranja)
+        style.configure("FimTurno.Action.TButton", background="#f39c12", foreground="white", font=("Segoe UI", 11, "bold"), borderwidth=0)
+        style.map("FimTurno.Action.TButton", background=[('active', "#e67e22"), ('disabled', "#555555")])
         
         # Timer (Label especial)
         style.configure("Timer.TLabel", foreground=accent_timer, font=("Segoe UI", 36, "bold"), background=bg_dark)
 
+        # Style for Treeview (History)
+        style.configure("Treeview", 
+            background=bg_dark, 
+            foreground=fg_white, 
+            fieldbackground=bg_dark, 
+            borderwidth=0,
+            font=("Segoe UI", 10)
+        )
+        style.configure("Treeview.Heading", 
+            background=bg_field, 
+            foreground=fg_white, 
+            relief="flat",
+            font=("Segoe UI", 10, "bold")
+        )
+        style.map("Treeview", background=[('selected', accent_blue)])
+
+        # Scrollbar Styling
+        style.element_create("My.Vertical.Scrollbar.trough", "from", "default")
+        style.element_create("My.Vertical.Scrollbar.thumb", "from", "default")
+        
+        style.layout("My.Vertical.TScrollbar", [
+            ('My.Vertical.Scrollbar.trough', {
+                'children': [
+                    ('My.Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nswe'})
+                ],
+                'sticky': 'ns'
+            })
+        ])
+
+        style.configure("My.Vertical.TScrollbar", 
+            background="#444444", 
+            troughcolor=bg_dark, 
+            borderwidth=0, 
+            arrowsize=0,
+            width=8
+        )
+        style.map("My.Vertical.TScrollbar", 
+            background=[('active', "#555555"), ('pressed', "#666666")]
+        )
+
 
     def _build_ui(self):
-        main_frame = ttk.Frame(self, padding="40 40 40 40")
-        main_frame.pack(fill="both", expand=True)
+        main_container = ttk.Frame(self, padding="20")
+        main_container.pack(fill="both", expand=True)
         
-        self.form_panel = FormPanel(main_frame, self.handle_search, self.handle_open_pdf)
+        # Left Panel: History (Slimmer width)
+        self.history_panel = HistoryPanel(main_container, ConfigManager.get_k8_data_path, width=280)
+        self.history_panel.pack(side="left", fill="both", expand=False, padx=(0, 20))
+        
+        # Right Panel: Operations
+        right_panel = ttk.Frame(main_container)
+        right_panel.pack(side="right", fill="both", expand=True)
+        
+        self.form_panel = FormPanel(right_panel, self.handle_search, self.handle_open_pdf)
         self.form_panel.pack(fill="x", pady=(0, 20))
         
-        # Espaço reservado equivalendo ao Stretch
-        spacer = ttk.Frame(main_frame)
+        # Stretch space
+        spacer = ttk.Frame(right_panel)
         spacer.pack(fill="both", expand=True)
         
-        self.action_panel = ActionPanel(main_frame, self.handle_iniciar, self.handle_finalizar)
+        self.action_panel = ActionPanel(right_panel, self.handle_iniciar, self.handle_finalizar, self.handle_fim_turno)
         self.action_panel.pack(fill="x", pady=(20, 0))
 
     def handle_search(self):
@@ -158,6 +247,28 @@ class AppWindow(tk.Tk):
         # In Tkinter, periodic checking for thread cancellation via UI flag
         self._check_runner_cancel()
         self.active_runner.start()
+        
+    def show_toast(self, message, duration=2000):
+        """Displays a non-blocking temporary message."""
+        toast = tk.Toplevel(self)
+        toast.overrideredirect(True)
+        toast.attributes("-topmost", True)
+        
+        # Style (3x larger as requested)
+        bg_color = "#34495e"
+        fg_color = "#ffffff"
+        label = tk.Label(toast, text=message, bg=bg_color, fg=fg_color, 
+                         padx=60, pady=30, font=("Segoe UI", 36, "bold"))
+        label.pack()
+        
+        # Center relative to self
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (label.winfo_reqwidth() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (label.winfo_reqheight() // 2)
+        toast.geometry(f"+{x}+{y}")
+        
+        # Auto-close
+        self.after(duration, toast.destroy)
 
     def _check_runner_cancel(self):
         if self.progress_win and self.progress_win.is_canceled and self.active_runner:
@@ -211,6 +322,7 @@ class AppWindow(tk.Tk):
             return False
             
         self.form_panel.disable_fields()
+        self._refresh_recent_operators() # Update on start too
         
         # Cópia do arquivo
         src_path = os.path.join(ConfigManager.get_server_path(), saida)
@@ -218,7 +330,7 @@ class AppWindow(tk.Tk):
         
         self.progress_win = ProgressDialog(self, title="Copiando arquivo CNC...", max_val=0)
         
-        self.active_runner = FileOperationRunner("COPY", src_path, dst_path, self.on_file_op_finished)
+        self.active_runner = FileOperationRunner("COPY", src_path, dst_path, lambda e: self.on_file_op_finished(e, "INICIADO"))
         self.active_runner.start()
         
         return True
@@ -252,6 +364,31 @@ class AppWindow(tk.Tk):
         
         self.active_runner = FileOperationRunner("MOVE", src_path, dst_path, lambda e: self.on_file_op_finished(e, "Corte Finalizado com sucesso!"))
         self.active_runner.start()
+        
+        # Refresh history after a small delay to ensure XML is written
+        self.after(500, self.history_panel.refresh_history)
+        self.after(600, self._refresh_recent_operators)
+
+    def handle_fim_turno(self):
+        if not messagebox.askyesno("Confirmar", "Deseja finalizar o turno? Isso irá arquivar os registros atuais e limpar a lista."):
+            return
+            
+        current_xml = ConfigManager.get_k8_data_path()
+        if os.path.exists(current_xml):
+            try:
+                # Archive name: dados_YYYY-MM-DD_Turno_HHMMSS.xml
+                timestamp = datetime.now().strftime("%H%M%S")
+                archive_name = current_xml.replace(".xml", f"_Turno_{timestamp}.xml")
+                os.rename(current_xml, archive_name)
+                
+                self.show_toast("Turno Finalizado e Arquivado!")
+                self.history_panel.refresh_history()
+                self._refresh_recent_operators()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Não foi possível arquivar o turno: {e}")
+        else:
+            self.history_panel.refresh_history()
+            self.show_toast("Lista limpa!")
 
     def on_file_op_finished(self, err_msg, success_title="Sucesso"):
         def finalize():
@@ -271,7 +408,13 @@ class AppWindow(tk.Tk):
             if err_msg:
                 messagebox.showwarning("Aviso de Rede", err_msg)
             else:
-                messagebox.showinfo("Sucesso", success_title)
+                if success_title == "INICIADO":
+                    self.show_toast("Corte Iniciado!")
+                else:
+                    messagebox.showinfo("Sucesso", success_title)
+                    # Reset timer only on successful finalization
+                    if "Finalizado" in success_title:
+                        self.action_panel.lbl_timer.config(text="00:00:00")
                 
             self.active_runner = None
             self.progress_win = None
@@ -303,3 +446,41 @@ class AppWindow(tk.Tk):
             self.active_runner = None
             self.progress_win = None
         self.after_idle(finalize)
+
+    def _refresh_recent_operators(self):
+        """Finds the last 3 unique operators from the current and recent XMLs."""
+        operators = []
+        
+        # 1. Try today's XML
+        xml_path = ConfigManager.get_k8_data_path()
+        if os.path.exists(xml_path):
+            self._extract_operators_from_file(xml_path, operators)
+            
+        # 2. If we need more, scan the directory for recent files
+        if len(operators) < 3:
+            data_dir = os.path.dirname(xml_path)
+            if os.path.exists(data_dir):
+                files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("dados_") and f.endswith(".xml")]
+                # Sort by modification time (most recent first)
+                files.sort(key=os.path.getmtime, reverse=True)
+                
+                for f in files:
+                    if f == xml_path: continue # already scanned
+                    self._extract_operators_from_file(f, operators)
+                    if len(operators) >= 3:
+                        break
+        
+        self.form_panel.update_operators(operators[:3])
+
+    def _extract_operators_from_file(self, file_path, operators_list):
+        try:
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+            for entrada in reversed(root.findall("Entrada")):
+                op = entrada.findtext("Operador", "")
+                if op and op not in operators_list:
+                    operators_list.append(op)
+                    if len(operators_list) >= 10: # limit scan
+                        break
+        except Exception:
+            pass

@@ -69,7 +69,7 @@ class DatabaseManager:
                 root = ET.Element("Dados")
                 tree = ET.ElementTree(root)
                 tree.write(file_path, encoding="utf-8", xml_declaration=True)
-            except OSError:
+            except Exception:
                 pass
 
     @staticmethod

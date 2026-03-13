@@ -4,10 +4,11 @@ import time
 from datetime import timedelta
 
 class ActionPanel(ttk.Frame):
-    def __init__(self, master, on_iniciar, on_finalizar, **kwargs):
+    def __init__(self, master, on_iniciar, on_finalizar, on_fim_turno, **kwargs):
         super().__init__(master, **kwargs)
         self.on_iniciar = on_iniciar
         self.on_finalizar = on_finalizar
+        self.on_fim_turno = on_fim_turno
         
         self.start_time = None
         self.running = False
@@ -15,13 +16,14 @@ class ActionPanel(ttk.Frame):
         self.setup_ui()
 
     def setup_ui(self):
-        # Center horizontally
+        # Weight 0 for action columns, weight 1 for spacer column (column 0)
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(3, weight=1)
+        self.columnconfigure(1, weight=0)
+        self.columnconfigure(2, weight=0)
         
-        # Timer Display
+        # Timer Display (Right aligned)
         self.lbl_timer = ttk.Label(self, text="00:00:00", style="Timer.TLabel")
-        self.lbl_timer.grid(row=0, column=1, columnspan=2, pady=(0, 15))
+        self.lbl_timer.grid(row=0, column=1, columnspan=2, pady=(0, 15), sticky="e")
         
         # Iniciar Button
         self.btn_iniciar = ttk.Button(self, text="INICIAR", command=self.on_iniciar_click, style="Iniciar.Action.TButton")
@@ -29,9 +31,12 @@ class ActionPanel(ttk.Frame):
         
         # Finalizar Button
         self.btn_finalizar = ttk.Button(self, text="FINALIZAR", command=self.on_finalizar_click, style="Finalizar.Action.TButton")
-
         self.btn_finalizar.grid(row=1, column=2, padx=5, sticky="ew")
         self.btn_finalizar.state(['disabled'])
+        
+        # Fim de Turno Button
+        self.btn_fim_turno = ttk.Button(self, text="FIM DE TURNO", command=self.on_fim_turno_click, style="FimTurno.Action.TButton")
+        self.btn_fim_turno.grid(row=2, column=1, columnspan=2, pady=(15, 0), sticky="ew")
 
     def on_iniciar_click(self):
         # Delegate logic up, only handle UI here if allowed
@@ -48,6 +53,9 @@ class ActionPanel(ttk.Frame):
         
         self.btn_iniciar.state(['!disabled'])
         self.btn_finalizar.state(['disabled'])
+
+    def on_fim_turno_click(self):
+        self.on_fim_turno()
 
     def start_timer(self):
         if not self.running:
