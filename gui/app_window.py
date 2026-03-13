@@ -1,9 +1,10 @@
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import webbrowser
 from datetime import datetime
 import xml.etree.ElementTree as ET
+import sys
 
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -40,6 +41,9 @@ class ProgressDialog(tk.Toplevel):
         self.btn_cancel = ttk.Button(self, text="Cancelar", command=self.on_cancel)
         self.btn_cancel.pack(pady=(10, 5))
         
+        self.btn_close = ttk.Button(self, text="Fechar", command=self.on_close)
+        self.btn_close.pack(pady=(0, 5))
+        
         self.is_canceled = False
         
         # Center on parent
@@ -47,12 +51,18 @@ class ProgressDialog(tk.Toplevel):
         x = master.winfo_x() + (master.winfo_width() // 2) - (self.winfo_width() // 2)
         y = master.winfo_y() + (master.winfo_height() // 2) - (self.winfo_height() // 2)
         self.geometry(f"+{x}+{y}")
-        self.protocol("WM_DELETE_WINDOW", self.on_cancel)
+        # Remove modal
+        # self.transient(master)
+        # self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def on_cancel(self):
         self.lbl_texto.config(text="Cancelando Busca...")
         self.btn_cancel.config(state="disabled")
         self.is_canceled = True
+
+    def on_close(self):
+        self.destroy()
 
     def set_progress(self, current, text=None):
         if text:
@@ -71,14 +81,23 @@ class AppWindow(tk.Tk):
         ConfigManager.load_settings()
         
         self._setup_styles()
-        self._load_icon()
         self._build_ui()
+        self._load_icon()
+        
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         self.active_runner = None
         self.progress_win = None
         
         # Initial population of operator suggestions
         self.after(500, self._refresh_recent_operators)
+
+    def on_closing(self):
+        # Ensure all background processes are stopped
+        if self.active_runner and self.active_runner.thread.is_alive():
+            self.active_runner.cancel()
+        self.quit()
+        sys.exit(0)
 
     def _setup_styles(self):
         style = ttk.Style(self)
@@ -207,11 +226,48 @@ class AppWindow(tk.Tk):
             try:
                 self.icon_photo = tk.PhotoImage(file=icon_path)
                 self.iconphoto(False, self.icon_photo)
+                # Também definir para a barra de tarefas no Windows
+                try:
+                    self.iconbitmap(icon_path)
+                except:
+                    pass  # Ignorar se não for .ico
             except Exception as e:
                 print(f"Erro ao carregar ícone: {e}")
 
 
+    def _create_menu(self):
+        menubar = tk.Menu(self)
+        
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Salvar Cópia XML", command=self.save_xml_copy)
+        
+        menubar.add_cascade(label="Arquivo", menu=file_menu)
+        
+        self.config(menu=menubar)
+
+    def save_xml_copy(self):
+        xml_path = ConfigManager.get_k8_data_path()
+        if not os.path.exists(xml_path):
+            messagebox.showinfo("Aviso", "Não há dados para copiar.")
+            return
+        
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".xml",
+            filetypes=[("XML files", "*.xml"), ("All files", "*.*")],
+            title="Salvar Cópia do XML"
+        )
+        
+        if save_path:
+            try:
+                import shutil
+                shutil.copy2(xml_path, save_path)
+                messagebox.showinfo("Sucesso", f"Cópia salva em: {save_path}")
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao salvar cópia: {e}")
+
     def _build_ui(self):
+        self._create_menu()
+        
         main_container = ttk.Frame(self, padding="20")
         main_container.pack(fill="both", expand=True)
         
@@ -230,7 +286,7 @@ class AppWindow(tk.Tk):
         spacer = ttk.Frame(right_panel)
         spacer.pack(fill="both", expand=True)
         
-        self.action_panel = ActionPanel(right_panel, self.handle_iniciar, self.handle_finalizar, self.handle_fim_turno)
+        self.action_panel = ActionPanel(right_panel, self.handle_iniciar, self.handle_finalizar)
         self.action_panel.pack(fill="x", pady=(20, 0))
 
     def handle_search(self):
@@ -244,6 +300,16 @@ class AppWindow(tk.Tk):
         self.form_panel.update_saidas([])
         self.form_panel.disable_fields()
         self.action_panel.btn_iniciar.state(['disabled'])
+        
+        base_path = ConfigManager.get_server_path()
+        if not os.path.exists(base_path):
+            messagebox.showwarning(
+                "Caminho inválido",
+                f"O diretório base para as saídas CNC não existe:\n{base_path}\n\nVerifique as configurações em config.ini."
+            )
+            self.form_panel.enable_fields()
+            self.action_panel.btn_iniciar.state(['!disabled'])
+            return
         
         self.progress_win = ProgressDialog(self, title="Buscando arquivos Cnc...", max_val=0) # starts indeterminate
         
@@ -379,25 +445,7 @@ class AppWindow(tk.Tk):
         self.after(500, self.history_panel.refresh_history)
         self.after(600, self._refresh_recent_operators)
 
-    def handle_fim_turno(self):
-        if not messagebox.askyesno("Confirmar", "Deseja finalizar o turno? Isso irá arquivar os registros atuais e limpar a lista."):
-            return
-            
-        current_xml = ConfigManager.get_k8_data_path()
-        if os.path.exists(current_xml):
-            try:
-                # Archive name: dados_YYYY-MM-DD_Turno_HHMMSS.xml
-                timestamp = datetime.now().strftime("%H%M%S")
-                archive_name = current_xml.replace(".xml", f"_Turno_{timestamp}.xml")
-                os.rename(current_xml, archive_name)
-                
-                self.show_toast("Turno Finalizado e Arquivado!")
-                self.history_panel.refresh_history()
-                self._refresh_recent_operators()
-            except Exception as e:
-                messagebox.showerror("Erro", f"Não foi possível arquivar o turno: {e}")
 
-    def on_file_op_finished(self, err_msg, success_title="Sucesso"):
         def finalize():
             if self.progress_win:
                 self.progress_win.close()
@@ -417,6 +465,13 @@ class AppWindow(tk.Tk):
             else:
                 if success_title == "INICIADO":
                     self.show_toast("Corte Iniciado!")
+                    # Abrir o arquivo .nif correspondente
+                    saida = self.form_panel.get_data()["saida"]
+                    if saida:
+                        nif_name = saida.replace(".cnc", ".nif")
+                        nif_path = os.path.join(ConfigManager.get_server_path(), nif_name)
+                        if os.path.exists(nif_path):
+                            webbrowser.open(f"file://{nif_path}")
                 else:
                     messagebox.showinfo("Sucesso", success_title)
                     # Reset timer only on successful finalization
@@ -436,7 +491,7 @@ class AppWindow(tk.Tk):
         
         self.progress_win = ProgressDialog(self, title="Procurando PDF na Rede...", max_val=0)
         
-        search_path = ConfigManager.get_plano_corte_path()
+        search_path = ConfigManager.get_server_path()
         self.active_runner = SearchPdfRunner(pdf_name, search_path, self.on_pdf_search_finished)
         self._check_runner_cancel()
         self.active_runner.start()
@@ -483,7 +538,11 @@ class AppWindow(tk.Tk):
         try:
             tree = ET.parse(file_path)
             root = tree.getroot()
+            current_pid = str(os.getpid())
             for entrada in reversed(root.findall("Entrada")):
+                instancia = entrada.findtext("Instancia", "")
+                if instancia != current_pid:
+                    continue
                 op = entrada.findtext("Operador", "")
                 if op and op not in operators_list:
                     operators_list.append(op)

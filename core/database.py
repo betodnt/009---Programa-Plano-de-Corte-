@@ -1,5 +1,7 @@
 import os
 import time
+import shutil
+from datetime import datetime
 from contextlib import contextmanager
 
 class SimpleLockFile:
@@ -58,10 +60,24 @@ def xml_lock(file_path):
         if acquired:
             lock.unlock()
 
+
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
 class DatabaseManager:
+    @staticmethod
+    def _auto_backup(file_path):
+        """Cria automaticamente uma cópia de backup do XML (sem perguntar)."""
+        try:
+            dirpath = os.path.dirname(file_path)
+            base = os.path.basename(file_path)
+            name, ext = os.path.splitext(base)
+            backup_name = f"{name}_backup{ext}"
+            backup_path = os.path.join(dirpath, backup_name)
+            shutil.copy2(file_path, backup_path)
+        except Exception:
+            pass
+
     @staticmethod
     def initialize_xml_if_needed(file_path):
         if not os.path.exists(file_path):
@@ -99,9 +115,11 @@ class DatabaseManager:
                 ET.SubElement(entrada, "Saida").text = str(saida)
                 ET.SubElement(entrada, "Tipo").text = str(tipo)
                 ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
+                ET.SubElement(entrada, "Instancia").text = str(os.getpid())
                 
                 # Salva com formatação básica
                 tree.write(file_path, encoding="utf-8", xml_declaration=True)
+                DatabaseManager._auto_backup(file_path)
                 return True, ""
             except Exception as e:
                 # Se falhar ao parsear (arquivo corrompido ou formato errado), cria novo
@@ -115,8 +133,10 @@ class DatabaseManager:
                     ET.SubElement(entrada, "Saida").text = str(saida)
                     ET.SubElement(entrada, "Tipo").text = str(tipo)
                     ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
+                    ET.SubElement(entrada, "Instancia").text = str(os.getpid())
                     tree = ET.ElementTree(root)
                     tree.write(file_path, encoding="utf-8", xml_declaration=True)
+                    DatabaseManager._auto_backup(file_path)
                     return True, ""
                 except Exception as inner_e:
                     return False, f"Erro fatal ao salvar XML: {inner_e}"
@@ -157,6 +177,7 @@ class DatabaseManager:
                     ET.SubElement(entrada, "TempoDecorrido").text = str(tempo_decorrido)
                 
                 tree.write(file_path, encoding="utf-8", xml_declaration=True)
+                DatabaseManager._auto_backup(file_path)
                 return True, ""
             except Exception as e:
                 return False, f"Erro XML ao finalizar: {e}"

@@ -58,8 +58,12 @@ class HistoryPanel(ttk.Frame):
             tree = ET.parse(xml_path)
             root = tree.getroot()
             
-            # Find all entries that have a completion time
+            # Find all entries that have a completion time and belong to this instance
+            current_pid = str(os.getpid())
             for entrada in root.findall("Entrada"):
+                instancia = entrada.findtext("Instancia", "")
+                if instancia != current_pid:
+                    continue
                 pedido = entrada.findtext("Pedido", "")
                 saida = entrada.findtext("Saida", "")
                 tempo = entrada.findtext("TempoDecorrido", "")

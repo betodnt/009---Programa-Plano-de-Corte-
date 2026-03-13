@@ -21,11 +21,12 @@ class ConfigManager:
     def _create_default_config():
         config = configparser.ConfigParser()
         config['Paths'] = {
-            'AcervoSaidasCNC': './public/saidas_a_cortar',
-            'SaidasCnc': './public/saidas_cnc',
-            'SaidasCortadas': './public/saidas_cortadas',
-            'PlanoCorte': './public/plano_corte',
-            'DadosXml': './public/dados/dados_{date}.xml' # Template placeholder
+            # Use a raw string so backslashes are not treated as escape sequences.
+            'AcervoSaidasCNC': r'V:\8. CONTROLE DE PRODUÇÃO\1. SAÍDAS A CORTAR',
+            'SaidasCnc': './Public/saidas_cnc',
+            'SaidasCortadas': r'V:\8. CONTROLE DE PRODUÇÃO\2. SAÍDAS CORTADAS',
+            'PlanoCorte': './Public/plano_corte',
+            'DadosXml': r'V:\8. CONTROLE DE PRODUÇÃO\3. DADOS/dados_{date}.xml' # Template placeholder
         }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
@@ -55,7 +56,7 @@ class ConfigManager:
 
     @staticmethod
     def get_server_path():
-        return ConfigManager._get_path('AcervoSaidasCNC', './public/saidas_a_cortar')
+        return ConfigManager._get_path('AcervoSaidasCNC', r'V:\8. CONTROLE DE PRODUÇÃO\1. SAÍDAS A CORTAR')
 
     @staticmethod
     def get_saidas_cnc_path():
