@@ -71,6 +71,7 @@ class AppWindow(tk.Tk):
         ConfigManager.load_settings()
         
         self._setup_styles()
+        self._load_icon()
         self._build_ui()
         
         self.active_runner = None
@@ -199,6 +200,15 @@ class AppWindow(tk.Tk):
         style.map("My.Vertical.TScrollbar", 
             background=[('active', "#555555"), ('pressed', "#666666")]
         )
+
+    def _load_icon(self):
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon.png")
+        if os.path.exists(icon_path):
+            try:
+                self.icon_photo = tk.PhotoImage(file=icon_path)
+                self.iconphoto(False, self.icon_photo)
+            except Exception as e:
+                print(f"Erro ao carregar ícone: {e}")
 
 
     def _build_ui(self):
