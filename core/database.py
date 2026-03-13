@@ -6,7 +6,7 @@ class SimpleLockFile:
     def __init__(self, lock_path):
         self.lock_path = lock_path
 
-    def tryLock(self, timeout_ms=2000):
+    def tryLock(self, timeout_ms=5000): # Aumentado de 2000 para 5000 para lidar com latência de rede
         start_time = time.time()
         timeout_sec = timeout_ms / 1000.0
         
@@ -15,14 +15,15 @@ class SimpleLockFile:
                 # 'x' mode fails if file already exists
                 # This is an atomic operation on Windows and POSIX
                 fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(fd, b'locked')
+                # Opcional: Escrever o nome da máquina/processo no lock para debug
+                os.write(fd, f"locked_by_{os.getpid()}".encode())
                 os.close(fd)
                 return True
             except FileExistsError:
-                # File exists, check if it's a stale lock (e.g. older than 5 seconds)
+                # File exists, check if it's a stale lock (e.g. older than 10 seconds)
                 try:
                     stats = os.stat(self.lock_path)
-                    if time.time() - stats.st_mtime > 5.0:
+                    if time.time() - stats.st_mtime > 10.0: # Aumentado de 5 para 10
                         # Stale lock, try to remove it
                         os.remove(self.lock_path)
                         continue
@@ -34,8 +35,7 @@ class SimpleLockFile:
             if time.time() - start_time > timeout_sec:
                 return False
                 
-            time.time()
-            time.sleep(0.1)
+            time.sleep(0.2) # Dormir um pouco mais entre tentativas
 
     def unlock(self):
         try:
@@ -50,7 +50,8 @@ class SimpleLockFile:
 def xml_lock(file_path):
     lock_path = file_path + ".lock"
     lock = SimpleLockFile(lock_path)
-    acquired = lock.tryLock(2000)
+    # 5 segundos de timeout para garantir que máquinas concorrentes esperem uma a outra
+    acquired = lock.tryLock(5000)
     try:
         yield acquired
     finally:
@@ -84,7 +85,7 @@ class DatabaseManager:
         DatabaseManager.initialize_xml_if_needed(file_path)
         with xml_lock(file_path) as acquired:
             if not acquired:
-                return False, "O banco de dados XML está ocupado no momento. Tente de novo."
+                return False, f"O servidor está ocupado salvando outro registro. Tente novamente em alguns segundos."
                 
             try:
                 tree = ET.parse(file_path)

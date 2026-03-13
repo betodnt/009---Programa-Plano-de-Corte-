@@ -9,9 +9,12 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 class ConfigManager:
     @staticmethod
     def _resolve_path(path_str):
-        """Converte caminhos relativos em absolutos baseado no diretório do projeto"""
+        """Converte caminhos relativos em absolutos, preservando caminhos de rede (UNC)"""
         if path_str.startswith('./'):
             return os.path.join(PROJECT_ROOT, path_str[2:])
+        # Se for um caminho UNC (\\servidor\pasta), retorna como está
+        if path_str.startswith('\\\\') or path_str.startswith('//'):
+            return path_str
         return path_str
     
     @staticmethod
