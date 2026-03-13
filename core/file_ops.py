@@ -1,5 +1,6 @@
 import shutil
 import threading
+import os
 
 class FileOperationRunner:
     def __init__(self, op_type, src, dst, on_finished):
@@ -14,6 +15,11 @@ class FileOperationRunner:
 
     def run(self):
         try:
+            # Ensure destination directory exists
+            dst_dir = os.path.dirname(self.dst)
+            if dst_dir and not os.path.exists(dst_dir):
+                os.makedirs(dst_dir, exist_ok=True)
+            
             if self.op_type == "COPY":
                 shutil.copy2(self.src, self.dst)
             elif self.op_type == "MOVE":

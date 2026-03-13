@@ -396,9 +396,6 @@ class AppWindow(tk.Tk):
                 self._refresh_recent_operators()
             except Exception as e:
                 messagebox.showerror("Erro", f"Não foi possível arquivar o turno: {e}")
-        else:
-            self.history_panel.refresh_history()
-            self.show_toast("Lista limpa!")
 
     def on_file_op_finished(self, err_msg, success_title="Sucesso"):
         def finalize():

@@ -1,2 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<Dados><Entrada><Pedido>TESTE-001</Pedido><Operador>DebugBot</Operador><Maquina>Virtual-CNC</Maquina><ChapaRetalho>Sim</ChapaRetalho><Saida>TestOut.cnc</Saida><Tipo>Teste</Tipo><DataHoraInicio>2026-03-11 23:40:07</DataHoraInicio><DataHoraTermino>2026-03-11 23:40:08</DataHoraTermino><TempoDecorrido>00:00:01</TempoDecorrido></Entrada></Dados>
