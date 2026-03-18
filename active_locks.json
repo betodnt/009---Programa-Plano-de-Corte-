@@ -1,0 +1,14 @@
+{
+  "Bodor1 (12K)|saida001.cnc": {
+    "maquina": "Bodor1 (12K)",
+    "saida": "saida001.cnc",
+    "pid": 1234,
+    "timestamp": 1773860830.5486376
+  },
+  "Bodor1 (12K)|E131_S06.cnc": {
+    "maquina": "Bodor1 (12K)",
+    "saida": "E131_S06.cnc",
+    "pid": 11724,
+    "timestamp": 1773861041.4203591
+  }
+}

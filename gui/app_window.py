@@ -10,6 +10,8 @@ from core.config import ConfigManager
 from core.database import DatabaseManager
 from core.search import SearchFilesRunner, SearchPdfRunner
 from core.file_ops import FileOperationRunner
+from core.operators import OperatorsManager
+from core.locks import LocksManager
 
 from gui.form_panel import FormPanel
 from gui.action_panel import ActionPanel
@@ -382,13 +384,22 @@ class AppWindow(tk.Tk):
         def finalize():
             if self.progress_win:
                 self.progress_win.close()
+            
+            # Se foi finalizado com sucesso, libera o lock
+            if not err_msg and success_title == "Corte Finalizado com sucesso!":
+                dados = self.form_panel.get_data()
+                LocksManager.release_lock(dados["maquina"], dados["saida"])
                 
             if "Corte Finalizado" in success_title and not err_msg:
                 self.form_panel.enable_fields()
                 self.action_panel.btn_iniciar.state(['!disabled'])
                 self.action_panel.btn_finalizar.state(['disabled'])
             elif err_msg:
-                 # If it failed to start, revert ui
+                 # If it failed to start, revert ui and release lock if iniciado failed
+                 if success_title == "INICIADO":
+                     dados = self.form_panel.get_data()
+                     LocksManager.release_lock(dados["maquina"], dados["saida"])
+                 
                  self.action_panel.stop_timer()
                  self.form_panel.enable_fields()
                  self.action_panel.lbl_timer.config(text="00:00:00")
@@ -432,6 +443,12 @@ class AppWindow(tk.Tk):
         if not sucesso:
             messagebox.showwarning("Erro", erro)
             return False
+        
+        # Salva operador no histórico persistente
+        OperatorsManager.add_operator(dados["operador"])
+        
+        # Adquire lock para máquina + saída
+        LocksManager.acquire_lock(dados["maquina"], saida)
             
         self.form_panel.disable_fields()
         self._refresh_recent_operators() # Update on start too
@@ -508,27 +525,31 @@ class AppWindow(tk.Tk):
         self.after_idle(finalize)
 
     def _refresh_recent_operators(self):
-        """Finds the last 3 unique operators from the current and recent XMLs."""
+        """Finds the last 3 unique operators from recent history and XML files."""
         operators = []
         
-        # 1. Try today's XML
-        xml_path = ConfigManager.get_k8_data_path()
-        if os.path.exists(xml_path):
-            self._extract_operators_from_file(xml_path, operators)
-            
-        # 2. If we need more, scan the directory for recent files
+        # 1. Primeiro tenta os operadores salvos no histórico persistente
+        persistent_operators = OperatorsManager.get_recent_operators(3)
+        operators.extend(persistent_operators)
+        
+        # 2. Se precisar mais, tenta dos XMLs recentes
         if len(operators) < 3:
-            data_dir = os.path.dirname(xml_path)
-            if os.path.exists(data_dir):
-                files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("dados_") and f.endswith(".xml")]
-                # Sort by modification time (most recent first)
-                files.sort(key=os.path.getmtime, reverse=True)
-                
-                for f in files:
-                    if f == xml_path: continue # already scanned
-                    self._extract_operators_from_file(f, operators)
-                    if len(operators) >= 3:
-                        break
+            xml_path = ConfigManager.get_k8_data_path()
+            if os.path.exists(xml_path):
+                self._extract_operators_from_file(xml_path, operators)
+            
+            # 3. Se ainda precisar mais, escaneia diretório
+            if len(operators) < 3:
+                data_dir = os.path.dirname(xml_path)
+                if os.path.exists(data_dir):
+                    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("dados_") and f.endswith(".xml")]
+                    files.sort(key=os.path.getmtime, reverse=True)
+                    
+                    for f in files:
+                        if f == xml_path: continue
+                        self._extract_operators_from_file(f, operators)
+                        if len(operators) >= 3:
+                            break
         
         self.form_panel.update_operators(operators[:3])
 

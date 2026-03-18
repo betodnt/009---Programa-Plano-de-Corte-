@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from core.locks import LocksManager
 
 class FormPanel(ttk.Frame):
     def __init__(self, master, on_search_trigger, on_open_pdf, **kwargs):
@@ -29,6 +30,7 @@ class FormPanel(ttk.Frame):
         self.var_maquina = tk.StringVar(value="Bodor1 (12K)")
         self.cbox_maquina = ttk.Combobox(self, textvariable=self.var_maquina, state="readonly", values=["Bodor1 (12K)", "Bodor2 (6K)", "Dardi"])
         self.cbox_maquina.grid(row=1, column=1, sticky="ew", padx=10, pady=(0, 15))
+        self.cbox_maquina.bind("<<ComboboxSelected>>", self._on_maquina_changed)
 
         # Tipo & Pedido
         lbl_tipo = ttk.Label(self, text="TIPO")
@@ -68,11 +70,24 @@ class FormPanel(ttk.Frame):
         self.btn_pdf.pack(side="right")
 
     def update_saidas(self, results):
-        self.cbox_saida['values'] = results
-        if results:
+        """Atualiza lista de saídas, filtrando as que estão bloqueadas"""
+        # Pega saídas bloqueadas para a máquina selecionada
+        maquina = self.var_maquina.get()
+        locked_saidas = LocksManager.get_locked_saidas(maquina)
+        
+        # Filtra saídas não bloqueadas
+        available_saidas = [s for s in results if s not in locked_saidas]
+        
+        self.cbox_saida['values'] = available_saidas
+        if available_saidas:
             self.cbox_saida.current(0)
         else:
             self.var_saida.set('')
+            
+        # Se há saídas bloqueadas, mostra em tooltip/label
+        if locked_saidas:
+            locked_str = ", ".join(locked_saidas)
+            # Nota: Tkinter não tem tooltip nativo, mas podemos adicionar um label auxiliar se necessário
 
     def update_operators(self, names):
         self.cbox_operador['values'] = names
@@ -99,3 +114,8 @@ class FormPanel(ttk.Frame):
             "retalho": self.var_retalho.get(),
             "saida": self.var_saida.get()
         }
+    
+    def _on_maquina_changed(self, event=None):
+        """Callback quando máquina é mudada - refaz filtragem de saídas"""
+        current_saidas = self.cbox_saida['values']
+        self.update_saidas(list(current_saidas))
