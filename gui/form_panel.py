@@ -119,3 +119,4 @@ class FormPanel(ttk.Frame):
         """Callback quando máquina é mudada - refaz filtragem de saídas"""
         current_saidas = self.cbox_saida['values']
         self.update_saidas(list(current_saidas))
+        self.update_saidas(list(current_saidas))

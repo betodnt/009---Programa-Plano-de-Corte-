@@ -93,6 +93,23 @@ class AppWindow(tk.Tk):
         
         # Initial population of operator suggestions
         self.after(500, self._refresh_recent_operators)
+        
+        # Atualização periódica dos locks (a cada 5 segundos)
+        self.after(1000, self._update_saidas_if_needed)
+
+    def _update_saidas_if_needed(self):
+        """Atualiza lista de saídas se houver mudanças nos locks"""
+        try:
+            # Só atualiza se há saídas no dropdown e campos estão habilitados
+            current_saidas = self.form_panel.cbox_saida['values']
+            if current_saidas and self.form_panel.cbox_saida.cget('state') == 'readonly':
+                # Refaz a filtragem com locks atuais
+                self.form_panel.update_saidas(list(current_saidas))
+        except:
+            pass  # Ignora erros para não quebrar a aplicação
+        
+        # Agenda próxima atualização em 5 segundos
+        self.after(5000, self._update_saidas_if_needed)
 
     def on_closing(self):
         # Ensure all background processes are stopped
@@ -431,6 +448,13 @@ class AppWindow(tk.Tk):
         if not saida: return False
         
         dados = self.form_panel.get_data()
+        
+        # Verifica se a combinação máquina+saída já está bloqueada por outra instância
+        if LocksManager.is_locked(dados["maquina"], saida):
+            messagebox.showwarning("Saída Indisponível", 
+                f"A saída '{saida}' já está sendo usada por outro operador na máquina '{dados['maquina']}'.\n\nEscolha outra saída ou aguarde a finalização.")
+            return False
+        
         dt_inicio = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         file_path = ConfigManager.get_k8_data_path()
