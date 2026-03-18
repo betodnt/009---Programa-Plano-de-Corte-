@@ -378,6 +378,42 @@ class AppWindow(tk.Tk):
             
         self.after_idle(finalize)
 
+    def on_file_op_finished(self, err_msg, success_title):
+        def finalize():
+            if self.progress_win:
+                self.progress_win.close()
+                
+            if "Corte Finalizado" in success_title and not err_msg:
+                self.form_panel.enable_fields()
+                self.action_panel.btn_iniciar.state(['!disabled'])
+                self.action_panel.btn_finalizar.state(['disabled'])
+            elif err_msg:
+                 # If it failed to start, revert ui
+                 self.action_panel.stop_timer()
+                 self.form_panel.enable_fields()
+                 self.action_panel.lbl_timer.config(text="00:00:00")
+            
+            if err_msg:
+                messagebox.showwarning("Aviso de Rede", err_msg)
+            else:
+                if success_title == "INICIADO":
+                    self.show_toast("Corte Iniciado!")
+                    # Abrir o arquivo .nif correspondente
+                    saida = self.form_panel.get_data()["saida"]
+                    if saida:
+                        nif_name = saida.replace(".cnc", ".nif")
+                        nif_path = os.path.join(ConfigManager.get_server_path(), nif_name)
+                        if os.path.exists(nif_path):
+                            webbrowser.open(f"file://{nif_path}")
+                else:
+                    messagebox.showinfo("Sucesso", success_title)
+                    # Reset timer only on successful finalization
+                    if "Finalizado" in success_title:
+                        self.action_panel.lbl_timer.config(text="00:00:00")
+                
+            self.active_runner = None
+            self.progress_win = None
+        self.after_idle(finalize)
 
     def handle_iniciar(self):
         saida = self.form_panel.get_data()["saida"]
@@ -444,44 +480,6 @@ class AppWindow(tk.Tk):
         # Refresh history after a small delay to ensure XML is written
         self.after(500, self.history_panel.refresh_history)
         self.after(600, self._refresh_recent_operators)
-
-
-        def finalize():
-            if self.progress_win:
-                self.progress_win.close()
-                
-            if "Corte Finalizado" in success_title and not err_msg:
-                self.form_panel.enable_fields()
-                self.action_panel.btn_iniciar.state(['!disabled'])
-                self.action_panel.btn_finalizar.state(['disabled'])
-            elif err_msg:
-                 # If it failed to start, revert ui
-                 self.action_panel.stop_timer()
-                 self.form_panel.enable_fields()
-                 self.action_panel.lbl_timer.config(text="00:00:00")
-            
-            if err_msg:
-                messagebox.showwarning("Aviso de Rede", err_msg)
-            else:
-                if success_title == "INICIADO":
-                    self.show_toast("Corte Iniciado!")
-                    # Abrir o arquivo .nif correspondente
-                    saida = self.form_panel.get_data()["saida"]
-                    if saida:
-                        nif_name = saida.replace(".cnc", ".nif")
-                        nif_path = os.path.join(ConfigManager.get_server_path(), nif_name)
-                        if os.path.exists(nif_path):
-                            webbrowser.open(f"file://{nif_path}")
-                else:
-                    messagebox.showinfo("Sucesso", success_title)
-                    # Reset timer only on successful finalization
-                    if "Finalizado" in success_title:
-                        self.action_panel.lbl_timer.config(text="00:00:00")
-                
-            self.active_runner = None
-            self.progress_win = None
-        self.after_idle(finalize)
-
 
     def handle_open_pdf(self):
         saida = self.form_panel.get_data()["saida"]
