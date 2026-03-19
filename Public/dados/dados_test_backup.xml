@@ -1,2 +1,2 @@
 <?xml version='1.0' encoding='utf-8'?>
-<Dados><Entrada><Pedido>TESTE-001</Pedido><Operador>DebugBot</Operador><Maquina>Virtual-CNC</Maquina><Chapa>Sim</Chapa><Saida>TestOut.cnc</Saida><Tipo>Teste</Tipo><DataHoraInicio>2026-03-18 22:26:46</DataHoraInicio><Instancia>15468</Instancia><DataHoraTermino>2026-03-18 22:26:47</DataHoraTermino><TempoDecorrido>00:00:01</TempoDecorrido></Entrada></Dados>
+<Dados><Entrada><Pedido>P001</Pedido><Operador>Joao</Operador><Maquina>Bodor1</Maquina><Chapa>Chapa</Chapa><Saida>saida01.cnc</Saida><Tipo>Pedido</Tipo><DataHoraInicio>2024-01-01 08:00:00</DataHoraInicio><Instancia>14484</Instancia><DataHoraTermino>2024-01-01 09:00:00</DataHoraTermino><TempoDecorrido>01:00:00</TempoDecorrido></Entrada></Dados>

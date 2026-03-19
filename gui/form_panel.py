@@ -8,6 +8,7 @@ class FormPanel(ttk.Frame):
         self.on_search_trigger = on_search_trigger
         self.on_open_pdf = on_open_pdf
         self.on_open_settings = on_open_settings
+        self._all_saidas = []
         
         self.setup_ui()
 
@@ -79,23 +80,18 @@ class FormPanel(ttk.Frame):
 
     def update_saidas(self, results):
         """Atualiza lista de saídas, filtrando as que estão bloqueadas"""
-        # Pega saídas bloqueadas para a máquina selecionada
+        self._all_saidas = list(results)
+        
         maquina = self.var_maquina.get()
         locked_saidas = LocksManager.get_locked_saidas(maquina)
         
-        # Filtra saídas não bloqueadas
-        available_saidas = [s for s in results if s not in locked_saidas]
+        available_saidas = [s for s in self._all_saidas if s not in locked_saidas]
         
         self.cbox_saida['values'] = available_saidas
         if available_saidas:
             self.cbox_saida.current(0)
         else:
             self.var_saida.set('')
-            
-        # Se há saídas bloqueadas, mostra em tooltip/label
-        if locked_saidas:
-            locked_str = ", ".join(locked_saidas)
-            # Nota: Tkinter não tem tooltip nativo, mas podemos adicionar um label auxiliar se necessário
 
     def update_operators(self, names):
         self.cbox_operador['values'] = names
@@ -125,5 +121,4 @@ class FormPanel(ttk.Frame):
     
     def _on_maquina_changed(self, event=None):
         """Callback quando máquina é mudada - refaz filtragem de saídas"""
-        current_saidas = self.cbox_saida['values']
-        self.update_saidas(list(current_saidas))
+        self.update_saidas(self._all_saidas)

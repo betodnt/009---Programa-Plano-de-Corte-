@@ -1,8 +1,10 @@
 {
-  "Bodor1 (12K)|saida001.cnc": {
-    "maquina": "Bodor1 (12K)",
-    "saida": "saida001.cnc",
-    "pid": 1234,
-    "timestamp": 1773883632.5868695
+  "Bodor2 (6K)|E131_S05.cnc": {
+    "maquina": "Bodor2 (6K)",
+    "saida": "E131_S05.cnc",
+    "operador": "Debuguer1",
+    "pedido": "131",
+    "pid": 11932,
+    "timestamp": 1773942522.2099211
   }
 }
