@@ -23,6 +23,14 @@ RED       = "#c0392b"
 ORANGE    = "#e67e22"
 
 
+def _pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
 def load_active_locks():
     if not os.path.exists(LOCKS_FILE):
         return {}
@@ -30,7 +38,24 @@ def load_active_locks():
         with open(LOCKS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         now = time.time()
-        return {k: v for k, v in data.items() if now - v.get("timestamp", 0) <= LOCK_TIMEOUT}
+        valid = {}
+        stale = []
+        for k, v in data.items():
+            if now - v.get("timestamp", 0) > LOCK_TIMEOUT:
+                stale.append(k)
+                continue
+            pid = v.get("pid")
+            if pid and not _pid_alive(int(pid)):
+                stale.append(k)
+                continue
+            valid[k] = v
+        if stale:
+            try:
+                with open(LOCKS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(valid, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+        return valid
     except Exception:
         return {}
 

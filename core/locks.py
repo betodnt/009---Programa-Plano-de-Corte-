@@ -56,6 +56,16 @@ class LocksManager:
             LocksManager._save_locks(locks)
 
     @staticmethod
+    def release_all_locks_for_pid():
+        locks = LocksManager._load_locks()
+        current_pid = os.getpid()
+        to_remove = [k for k, v in locks.items() if v.get('pid') == current_pid]
+        for k in to_remove:
+            del locks[k]
+        if to_remove:
+            LocksManager._save_locks(locks)
+
+    @staticmethod
     def is_locked(maquina, saida):
         locks = LocksManager._load_locks()
         locks = LocksManager._clean_expired_locks(locks)

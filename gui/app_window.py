@@ -100,6 +100,7 @@ class AppWindow(tk.Tk):
     def on_closing(self):
         if self.active_runner and self.active_runner.thread.is_alive():
             self.active_runner.cancel()
+        LocksManager.release_all_locks_for_pid()
         self.quit()
         sys.exit(0)
 

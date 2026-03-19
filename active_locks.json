@@ -1,10 +1,1 @@
-{
-  "Bodor2 (6K)|E131_S05.cnc": {
-    "maquina": "Bodor2 (6K)",
-    "saida": "E131_S05.cnc",
-    "operador": "Debuguer1",
-    "pedido": "131",
-    "pid": 11932,
-    "timestamp": 1773942522.2099211
-  }
-}
+{}
