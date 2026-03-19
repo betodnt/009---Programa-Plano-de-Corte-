@@ -321,6 +321,7 @@ class AppWindow(tk.Tk):
                         file_path, dados["pedido"], dados["operador"], dados["maquina"], dt_termino, self.elapsed_time)
                     LocksManager.release_lock(dados["maquina"], dados["saida"])
                     self.form_panel.update_saidas(self.form_panel._all_saidas)
+                    self.history_panel.refresh_history()
                     self.form_panel.enable_fields()
                     self.action_panel.btn_iniciar.state(['!disabled'])
                     self.action_panel.btn_finalizar.state(['disabled'])
@@ -368,6 +369,10 @@ class AppWindow(tk.Tk):
         dados = self.form_panel.get_data()
         saida = dados["saida"]
         if not saida:
+            return
+
+        # Ask for confirmation
+        if not messagebox.askyesno("Confirmar Finalização", f"Tem certeza que deseja finalizar a saída '{saida}'?"):
             return
 
         self.end_time = datetime.now()

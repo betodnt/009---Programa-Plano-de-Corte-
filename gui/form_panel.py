@@ -90,8 +90,14 @@ class FormPanel(ttk.Frame):
         self.cbox_saida['values'] = available_saidas
         if available_saidas:
             self.cbox_saida.current(0)
+            # Enable iniciar button
+            if hasattr(self.master, 'action_panel'):
+                self.master.action_panel.btn_iniciar.state(['!disabled'])
         else:
             self.var_saida.set('')
+            # Disable iniciar button
+            if hasattr(self.master, 'action_panel'):
+                self.master.action_panel.btn_iniciar.state(['disabled'])
 
     def update_operators(self, names):
         self.cbox_operador['values'] = names
