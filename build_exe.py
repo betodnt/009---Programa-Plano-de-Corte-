@@ -23,9 +23,11 @@ def build_exe():
         "--clean",  # Limpa cache para build mais limpo
         "--strip",  # Remove símbolos de debug para reduzir tamanho
         "--name=ProgramaPlanoCorte",  # Nome do executável
+        "--icon=icon.ico",  # Ícone do executável
         "--add-data=config.ini;.",  # Incluir config.ini
         "--add-data=Public;Public",  # Incluir pasta Public
         "--add-data=icon.png;.",  # Incluir ícone se existir
+        "--add-data=icon.ico;.",  # Incluir ico
         "--hidden-import=xml.etree.ElementTree",  # Garantir import oculto
         "--hidden-import=webbrowser",
         "--hidden-import=threading",

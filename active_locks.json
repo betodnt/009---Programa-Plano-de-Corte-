@@ -1,1 +1,8 @@
-{}
+{
+  "Bodor1 (12K)|saida001.cnc": {
+    "maquina": "Bodor1 (12K)",
+    "saida": "saida001.cnc",
+    "pid": 1234,
+    "timestamp": 1773883632.5868695
+  }
+}

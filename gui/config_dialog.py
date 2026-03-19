@@ -1,0 +1,126 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from core.config import ConfigManager
+
+class ConfigDialog(tk.Toplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("Configurações de Diretórios")
+        self.geometry("700x680")
+        self.resizable(False, False)
+        
+        # Make it modal
+        self.transient(master)
+        self.grab_set()
+
+        self.configure(bg="#2b2b2b")
+        
+        # Carrega configurações atuais
+        self.current_settings = ConfigManager.get_all_settings()
+        
+        self.entries = {}
+        
+        self._build_ui()
+        
+        # Centralizar a janela
+        self.update_idletasks()
+        x = master.winfo_x() + (master.winfo_width() // 2) - (self.winfo_width() // 2)
+        y = master.winfo_y() + (master.winfo_height() // 2) - (self.winfo_height() // 2)
+        self.geometry(f"+{x}+{y}")
+
+    def _build_ui(self):
+        # Botões do rodapé sempre presos no fundo
+        btn_frame = ttk.Frame(self, padding="10")
+        btn_frame.pack(side="bottom", fill="x")
+        
+        btn_save = ttk.Button(btn_frame, text="Salvar", command=self._save_settings)
+        btn_save.pack(side="right", padx=(10, 0))
+        
+        btn_cancel = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
+        btn_cancel.pack(side="right")
+
+        main_frame = ttk.Frame(self, padding="20")
+        main_frame.pack(side="top", fill="both", expand=True)
+
+        lbl_title = ttk.Label(main_frame, text="Configurar caminho", font=("Segoe UI", 16, "bold"), justify="center", anchor="center")
+        lbl_title.pack(pady=(0, 20), anchor="center")
+
+        # Definição dos campos para a interface
+        fields = [
+            ("acervosaidascnc", "Caminho do Servidor (Acervo CNC):", "Pasta onde estão os arquivos originais (.cnc)"),
+            ("saidascnc", "Pasta Local (Saídas CNC):", "Pasta temporária para onde são copiados os arquivos a cortar"),
+            ("saidascortadas", "Saídas Cortadas:", "Pasta para onde os arquivos vão após o término do corte"),
+            ("dadosxml", "Caminho do Banco XML:", "Arquivo de banco de dados (ex: .../dados_{date}.xml)"),
+            ("planocorte", "Plano de Corte (PDFs):", "Pasta base onde estão os PDFs")
+        ]
+
+        grid_frame = ttk.Frame(main_frame)
+        grid_frame.pack(fill="x", expand=True)
+
+        for i, (key, label_text, tooltip) in enumerate(fields):
+            # Label para o título do campo
+            lbl = ttk.Label(grid_frame, text=label_text, font=("Segoe UI", 10, "bold"))
+            lbl.grid(row=i*3, column=0, sticky="w", pady=(10, 0))
+            
+            # Entry para o caminho
+            entry_var = tk.StringVar()
+            # Pega o valor atual (ignora case insensitive pois o configparser salva chave minúscula por padrão)
+            val = self.current_settings.get(key.lower(), self.current_settings.get(key, ""))
+            entry_var.set(val)
+            
+            entry = ttk.Entry(grid_frame, textvariable=entry_var, width=50)
+            entry.grid(row=i*3+1, column=0, sticky="ew", pady=(2, 5), padx=(0, 10))
+            
+            # Mapeia a variável pelo nome da chave para salvar depois
+            self.entries[key.lower()] = entry_var
+
+            # Botão de procurar
+            btn_browse = ttk.Button(grid_frame, text="Procurar...", width=12,
+                                    command=lambda k=key.lower(): self._browse_path(k))
+            btn_browse.grid(row=i*3+1, column=1, pady=(2, 5))
+            
+            # Label de dica explicativa
+            lbl_tip = ttk.Label(grid_frame, text=tooltip, font=("Segoe UI", 8), foreground="#aaaaaa")
+            lbl_tip.grid(row=i*3+2, column=0, columnspan=2, sticky="w", pady=(0, 5))
+
+        grid_frame.columnconfigure(0, weight=1)
+
+    def _browse_path(self, key):
+        initial_dir = self.entries[key].get()
+        
+        if key == "dadosxml": # Tratamento especial caso o usuário queira escolher um arquivo que já existe ou definir a pasta
+            file_path = filedialog.asksaveasfilename(
+                parent=self,
+                title="Selecione ou digite o nome do XML",
+                initialdir=initial_dir if "{" not in initial_dir else "",
+                defaultextension=".xml",
+                filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
+            )
+            if file_path:
+                self.entries[key].set(file_path)
+        else:
+            folder_path = filedialog.askdirectory(parent=self, title="Selecione a Pasta", initialdir=initial_dir)
+            if folder_path:
+                # Converter barras para o padrão do SO se necessário, mas o Python e o ConfigManager lidam com as duas
+                # Para ser consistente, vamos gravar como raw string form
+                self.entries[key].set(folder_path)
+
+    def _save_settings(self):
+        new_settings = {}
+        for key, var in self.entries.items():
+            new_val = var.get().strip()
+            if not new_val:
+                messagebox.showwarning("Aviso", f"O campo associado à chave '{key}' não pode estar vazio.", parent=self)
+                return
+            new_settings[key] = new_val
+
+        try:
+            ConfigManager.save_settings(new_settings)
+            
+            # Dica visual: pode ser necessário reiniciar (recarregar ConfigManager)
+            ConfigManager.load_settings()
+            
+            messagebox.showinfo("Sucesso", "Configurações salvas com sucesso!", parent=self)
+            self.destroy()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Ocorreu um erro ao salvar as configurações:\n{e}", parent=self)

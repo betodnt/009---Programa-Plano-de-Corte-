@@ -3,10 +3,11 @@ from tkinter import ttk
 from core.locks import LocksManager
 
 class FormPanel(ttk.Frame):
-    def __init__(self, master, on_search_trigger, on_open_pdf, **kwargs):
+    def __init__(self, master, on_search_trigger, on_open_pdf, on_open_settings, **kwargs):
         super().__init__(master, **kwargs)
         self.on_search_trigger = on_search_trigger
         self.on_open_pdf = on_open_pdf
+        self.on_open_settings = on_open_settings
         
         self.setup_ui()
 
@@ -14,10 +15,11 @@ class FormPanel(ttk.Frame):
         # Configure grid expansion
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
-        self.columnconfigure(2, weight=1)
-        self.columnconfigure(3, weight=1)
+        self.columnconfigure(2, weight=0)
+        self.columnconfigure(3, weight=0)
         
         # Row-based layout for more space
+        
         # Operador & Máquina
         lbl_op = ttk.Label(self, text="OPERADOR")
         lbl_op.grid(row=0, column=0, sticky="w", padx=10, pady=(10, 2))
@@ -31,6 +33,12 @@ class FormPanel(ttk.Frame):
         self.cbox_maquina = ttk.Combobox(self, textvariable=self.var_maquina, state="readonly", values=["Bodor1 (12K)", "Bodor2 (6K)", "Dardi"])
         self.cbox_maquina.grid(row=1, column=1, sticky="ew", padx=10, pady=(0, 15))
         self.cbox_maquina.bind("<<ComboboxSelected>>", self._on_maquina_changed)
+        
+        # Botão de engrenagem à direita da máquina
+        self.btn_settings = tk.Button(self, text="⚙", font=("Segoe UI", 22), fg="white", bg="#2b2b2b",
+                                      activebackground="#3c3f41", activeforeground="white",
+                                      relief="flat", borderwidth=0, cursor="hand2", command=self.on_open_settings)
+        self.btn_settings.grid(row=0, column=2, padx=0, pady=0, sticky="ne")
 
         # Tipo & Pedido
         lbl_tipo = ttk.Label(self, text="TIPO")
@@ -118,5 +126,4 @@ class FormPanel(ttk.Frame):
     def _on_maquina_changed(self, event=None):
         """Callback quando máquina é mudada - refaz filtragem de saídas"""
         current_saidas = self.cbox_saida['values']
-        self.update_saidas(list(current_saidas))
         self.update_saidas(list(current_saidas))

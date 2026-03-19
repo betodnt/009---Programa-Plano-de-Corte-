@@ -1,10 +1,10 @@
 import os
 import configparser
 
-CONFIG_FILE = "config.ini"
-
 # Get the absolute path to the project root directory
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.ini")
 
 class ConfigManager:
     @staticmethod
@@ -85,3 +85,34 @@ class ConfigManager:
     @staticmethod
     def get_plano_corte_path():
         return ConfigManager._get_path('PlanoCorte', './public/plano_corte')
+
+    @staticmethod
+    def get_all_settings():
+        """Retorna todos os caminhos configurados no config.ini como um dicionário"""
+        if not os.path.exists(CONFIG_FILE):
+            ConfigManager._create_default_config()
+
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE, encoding='utf-8')
+        
+        settings = {}
+        if config.has_section('Paths'):
+            for key in config.options('Paths'):
+                settings[key] = config.get('Paths', key)
+        return settings
+
+    @staticmethod
+    def save_settings(new_settings):
+        """Salva as configurações atualizadas no config.ini"""
+        config = configparser.ConfigParser()
+        if os.path.exists(CONFIG_FILE):
+            config.read(CONFIG_FILE, encoding='utf-8')
+            
+        if not config.has_section('Paths'):
+            config.add_section('Paths')
+
+        for key, value in new_settings.items():
+            config.set('Paths', key, str(value))
+
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
+            config.write(configfile)

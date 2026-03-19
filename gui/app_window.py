@@ -16,6 +16,7 @@ from core.locks import LocksManager
 from gui.form_panel import FormPanel
 from gui.action_panel import ActionPanel
 from gui.history_panel import HistoryPanel
+from gui.config_dialog import ConfigDialog
 
 class ProgressDialog(tk.Toplevel):
     def __init__(self, master, title="Aguarde...", max_val=0):
@@ -23,11 +24,12 @@ class ProgressDialog(tk.Toplevel):
         self.title(title)
         self.geometry("300x120")
         self.resizable(False, False)
+        self.configure(bg="#2b2b2b")
         # Make it modal
         self.transient(master)
         self.grab_set()
         
-        self.lbl_texto = ttk.Label(self, text="Aguarde...")
+        self.lbl_texto = tk.Label(self, text="Aguarde...", bg="#2b2b2b", fg="#ffffff", font=("Segoe UI", 11), justify="center")
         self.lbl_texto.pack(pady=(15, 10))
         
         # se max_val for 0, usa modo inderteminado
@@ -240,54 +242,28 @@ class AppWindow(tk.Tk):
         )
 
     def _load_icon(self):
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon.png")
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        icon_path = os.path.join(base_dir, "icon.png")
+        icon_ico_path = os.path.join(base_dir, "icon.ico")
+        
         if os.path.exists(icon_path):
             try:
                 self.icon_photo = tk.PhotoImage(file=icon_path)
-                self.iconphoto(False, self.icon_photo)
-                # Também definir para a barra de tarefas no Windows
+                self.iconphoto(True, self.icon_photo)
                 try:
-                    self.iconbitmap(icon_path)
+                    if os.path.exists(icon_ico_path):
+                        self.iconbitmap(icon_ico_path)
                 except:
-                    pass  # Ignorar se não for .ico
+                    pass
             except Exception as e:
                 print(f"Erro ao carregar ícone: {e}")
 
-
-    def _create_menu(self):
-        menubar = tk.Menu(self)
-        
-        file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Salvar Cópia XML", command=self.save_xml_copy)
-        
-        menubar.add_cascade(label="Arquivo", menu=file_menu)
-        
-        self.config(menu=menubar)
-
-    def save_xml_copy(self):
-        xml_path = ConfigManager.get_k8_data_path()
-        if not os.path.exists(xml_path):
-            messagebox.showinfo("Aviso", "Não há dados para copiar.")
-            return
-        
-        save_path = filedialog.asksaveasfilename(
-            defaultextension=".xml",
-            filetypes=[("XML files", "*.xml"), ("All files", "*.*")],
-            title="Salvar Cópia do XML"
-        )
-        
-        if save_path:
-            try:
-                import shutil
-                shutil.copy2(xml_path, save_path)
-                messagebox.showinfo("Sucesso", f"Cópia salva em: {save_path}")
-            except Exception as e:
-                messagebox.showerror("Erro", f"Erro ao salvar cópia: {e}")
+    def open_settings(self):
+        config_win = ConfigDialog(self)
+        self.wait_window(config_win)
 
     def _build_ui(self):
-        self._create_menu()
-        
-        main_container = ttk.Frame(self, padding="20")
+        main_container = ttk.Frame(self, padding="10")
         main_container.pack(fill="both", expand=True)
         
         # Left Panel: History (Slimmer width)
@@ -298,7 +274,7 @@ class AppWindow(tk.Tk):
         right_panel = ttk.Frame(main_container)
         right_panel.pack(side="right", fill="both", expand=True)
         
-        self.form_panel = FormPanel(right_panel, self.handle_search, self.handle_open_pdf)
+        self.form_panel = FormPanel(right_panel, self.handle_search, self.handle_open_pdf, self.open_settings)
         self.form_panel.pack(fill="x", pady=(0, 20))
         
         # Stretch space
@@ -306,7 +282,7 @@ class AppWindow(tk.Tk):
         spacer.pack(fill="both", expand=True)
         
         self.action_panel = ActionPanel(right_panel, self.handle_iniciar, self.handle_finalizar)
-        self.action_panel.pack(fill="x", pady=(20, 0))
+        self.action_panel.pack(fill="x", pady=(20, 20), padx=(0, 20))
 
     def handle_search(self):
         dados = self.form_panel.get_data()
@@ -526,7 +502,8 @@ class AppWindow(tk.Tk):
         saida = self.form_panel.get_data()["saida"]
         if not saida: return
         
-        pdf_name = saida.split("_S")[0] + ".pdf"
+        # O usuário quer o nome do arquivo exatamente antes do .cnc
+        pdf_name = saida.replace(".cnc", ".pdf")
         
         self.progress_win = ProgressDialog(self, title="Procurando PDF na Rede...", max_val=0)
         
