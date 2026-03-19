@@ -52,10 +52,11 @@ def load_active_locks():
             if now - v.get("timestamp", 0) > LOCK_TIMEOUT:
                 stale.append(k)
                 continue
-            pid = v.get("pid")
-            if pid and not _pid_alive(int(pid)):
-                stale.append(k)
-                continue
+            # Removed PID check for speed
+            # pid = v.get("pid")
+            # if pid and not _pid_alive(int(pid)):
+            #     stale.append(k)
+            #     continue
             valid[k] = v
         if stale:
             try:

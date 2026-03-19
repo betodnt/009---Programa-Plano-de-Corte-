@@ -4,6 +4,8 @@ from tkinter import ttk, messagebox
 import webbrowser
 from datetime import datetime
 import sys
+import threading
+import time
 
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -88,6 +90,7 @@ class AppWindow(tk.Tk):
 
         self.after(500, self._refresh_recent_operators)
         self.after(1000, self._update_saidas_if_needed)
+        self.after(0, self.history_panel.refresh_history)
 
     def _update_saidas_if_needed(self):
         try:
@@ -295,6 +298,13 @@ class AppWindow(tk.Tk):
                 messagebox.showwarning("Aviso de Rede", err_msg)
             else:
                 if success_title == "INICIADO":
+                    # Save entrada after successful copy
+                    dados = self.form_panel.get_data()
+                    dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
+                    file_path = ConfigManager.get_k8_data_path()
+                    DatabaseManager.save_entrada(
+                        file_path, dados["pedido"], dados["operador"], dados["maquina"],
+                        dados["retalho"], saida, dados["tipo"], dt_inicio)
                     self.show_toast("Corte Iniciado!")
                     saida = self.form_panel.get_data()["saida"]
                     if saida:
@@ -303,8 +313,14 @@ class AppWindow(tk.Tk):
                         if os.path.exists(nif_path):
                             webbrowser.open(f"file://{nif_path}")
                 else:
+                    # Save termino after successful move
                     dados = self.form_panel.get_data()
+                    dt_termino = self.end_time.strftime("%Y-%m-%d %H:%M:%S")
+                    file_path = ConfigManager.get_k8_data_path()
+                    DatabaseManager.save_termino(
+                        file_path, dados["pedido"], dados["operador"], dados["maquina"], dt_termino, self.elapsed_time)
                     LocksManager.release_lock(dados["maquina"], dados["saida"])
+                    self.form_panel.update_saidas(self.form_panel._all_saidas)
                     self.form_panel.enable_fields()
                     self.action_panel.btn_iniciar.state(['!disabled'])
                     self.action_panel.btn_finalizar.state(['disabled'])
@@ -330,16 +346,8 @@ class AppWindow(tk.Tk):
                 f"A saída '{saida}' já está sendo usada por outro operador na máquina '{dados['maquina']}'.\n\nEscolha outra saída ou aguarde a finalização.")
             return False
 
-        dt_inicio = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        file_path = ConfigManager.get_k8_data_path()
-
-        sucesso, erro = DatabaseManager.save_entrada(
-            file_path, dados["pedido"], dados["operador"], dados["maquina"],
-            dados["retalho"], saida, dados["tipo"], dt_inicio)
-
-        if not sucesso:
-            messagebox.showwarning("Erro", erro)
-            return False
+        self.start_time = datetime.now()
+        dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
 
         OperatorsManager.add_operator(dados["operador"])
         LocksManager.acquire_lock(dados["maquina"], saida, dados["operador"], dados["pedido"])
@@ -362,18 +370,8 @@ class AppWindow(tk.Tk):
         if not saida:
             return
 
-        dt_termino = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        tempo_decorrido = self.action_panel.get_elapsed_time_string()
-        file_path = ConfigManager.get_k8_data_path()
-
-        sucesso, erro = DatabaseManager.save_termino(
-            file_path, dados["pedido"], dados["operador"], dados["maquina"], dt_termino, tempo_decorrido)
-
-        if not sucesso:
-            messagebox.showwarning("Erro", erro)
-            self.action_panel.btn_finalizar.state(['!disabled'])
-            self.action_panel.btn_iniciar.state(['disabled'])
-            return
+        self.end_time = datetime.now()
+        self.elapsed_time = self.action_panel.get_elapsed_time_string()
 
         src_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
         dst_path = os.path.join(ConfigManager.get_saidas_cortadas_path(), saida)

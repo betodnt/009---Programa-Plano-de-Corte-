@@ -9,7 +9,7 @@ class HistoryPanel(ttk.Frame):
         self.get_xml_path_func = get_xml_path_func
         self.current_operator = ""
         self.setup_ui()
-        self.refresh_history()
+        # Removed refresh_history() from here to speed up startup
 
     def set_operator(self, operator_name):
         """Define o operador atual para filtrar o histórico."""
