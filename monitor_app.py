@@ -25,10 +25,18 @@ ORANGE    = "#e67e22"
 
 def _pid_alive(pid):
     try:
-        os.kill(pid, 0)
+        import ctypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, int(pid))
+        if not handle:
+            return False
+        code = ctypes.c_ulong(0)
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == STILL_ACTIVE
+    except Exception:
         return True
-    except (OSError, ProcessLookupError):
-        return False
 
 
 def load_active_locks():
