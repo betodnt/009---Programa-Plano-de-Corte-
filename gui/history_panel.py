@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+import logging
 import xml.etree.ElementTree as ET
 import os
 
@@ -76,4 +77,4 @@ class HistoryPanel(ttk.Frame):
 
             self.after(100, self.update_scrollbar)
         except Exception as e:
-            print(f"Error reading history XML: {e}")
+            logging.error(f"Erro ao ler histórico XML: {e}")

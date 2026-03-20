@@ -1,5 +1,7 @@
+import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import tkinter.scrolledtext as st
 from core.config import ConfigManager
 
 class ConfigDialog(tk.Toplevel):
@@ -39,11 +41,26 @@ class ConfigDialog(tk.Toplevel):
         btn_cancel = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
         btn_cancel.pack(side="right")
 
-        main_frame = ttk.Frame(self, padding="20")
-        main_frame.pack(side="top", fill="both", expand=True)
+        # Criação das Abas
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-        lbl_title = ttk.Label(main_frame, text="Configurar caminho", font=("Segoe UI", 16, "bold"), justify="center", anchor="center")
+        # Aba Geral
+        self.tab_general = ttk.Frame(self.notebook, padding="20")
+        self.notebook.add(self.tab_general, text="Geral")
+        self._setup_general_tab(self.tab_general)
+
+        # Aba Logs
+        self.tab_logs = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(self.tab_logs, text="Logs do Sistema")
+        self._setup_logs_tab(self.tab_logs)
+
+    def _setup_general_tab(self, parent):
+        lbl_title = ttk.Label(parent, text="Configurar caminhos", font=("Segoe UI", 16, "bold"), justify="center", anchor="center")
         lbl_title.pack(pady=(0, 20), anchor="center")
+
+        grid_frame = ttk.Frame(parent)
+        grid_frame.pack(fill="x", expand=True)
 
         # Definição dos campos para a interface
         fields = [
@@ -51,11 +68,8 @@ class ConfigDialog(tk.Toplevel):
             ("saidascnc", "Pasta Local (Saídas CNC):", "Pasta temporária para onde são copiados os arquivos a cortar"),
             ("saidascortadas", "Saídas Cortadas:", "Pasta para onde os arquivos vão após o término do corte"),
             ("dadosxml", "Caminho do Banco XML:", "Arquivo de banco de dados (ex: .../dados_{date}.xml)"),
-            ("planocorte", "Plano de Corte (PDFs):", "Pasta base onde estão os PDFs")
+            ("planocorte", "Plano de Corte (PDFs):", "Pasta base onde estão os PDFs (suporta placeholders: {year}, {month}, {month_name}, {day}, {date}, {date_br})")
         ]
-
-        grid_frame = ttk.Frame(main_frame)
-        grid_frame.pack(fill="x", expand=True)
 
         for i, (key, label_text, tooltip) in enumerate(fields):
             # Label para o título do campo
@@ -84,6 +98,45 @@ class ConfigDialog(tk.Toplevel):
             lbl_tip.grid(row=i*3+2, column=0, columnspan=2, sticky="w", pady=(0, 5))
 
         grid_frame.columnconfigure(0, weight=1)
+
+    def _setup_logs_tab(self, parent):
+        # Botões de controle do log
+        controls_frame = ttk.Frame(parent)
+        controls_frame.pack(fill="x", pady=(0, 5))
+
+        btn_refresh = ttk.Button(controls_frame, text="Atualizar Logs", command=self._load_logs)
+        btn_refresh.pack(side="left", padx=(0, 10))
+        
+        btn_clear = ttk.Button(controls_frame, text="Limpar Visualização", command=lambda: self.txt_logs.delete('1.0', tk.END))
+        btn_clear.pack(side="left")
+
+        # Área de texto com scroll
+        self.txt_logs = st.ScrolledText(parent, wrap=tk.WORD, font=("Consolas", 9), bg="#1e1e1e", fg="#e0e0e0")
+        self.txt_logs.pack(fill="both", expand=True)
+        
+        # Carrega logs iniciais
+        self._load_logs()
+
+    def _load_logs(self):
+        self.txt_logs.delete('1.0', tk.END)
+        
+        # Caminho relativo baseado na raiz do projeto
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        log_path = os.path.join(base_dir, "logs", "app_errors.log")
+        
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if not content:
+                        content = "<Arquivo de log vazio>"
+                    self.txt_logs.insert(tk.END, content)
+                    # Rola para o final para ver os erros mais recentes
+                    self.txt_logs.see(tk.END)
+            except Exception as e:
+                self.txt_logs.insert(tk.END, f"Erro ao ler arquivo de log: {e}")
+        else:
+            self.txt_logs.insert(tk.END, "Nenhum arquivo de log encontrado (logs/app_errors.log).")
 
     def _browse_path(self, key):
         initial_dir = self.entries[key].get()

@@ -3,24 +3,32 @@ import os
 import time
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOCKS_FILE = os.path.join(_PROJECT_ROOT, "active_locks.json")
 LOCK_TIMEOUT = 3600
+
+def _get_locks_file():
+    try:
+        from core.config import ConfigManager
+        return ConfigManager.get_locks_file_path()
+    except Exception:
+        return os.path.join(_PROJECT_ROOT, "active_locks.json")
 
 class LocksManager:
 
     @staticmethod
     def _load_locks():
-        if not os.path.exists(LOCKS_FILE):
+        locks_file = _get_locks_file()
+        if not os.path.exists(locks_file):
             return {}
         try:
-            with open(LOCKS_FILE, 'r', encoding='utf-8') as f:
+            with open(locks_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
             return {}
 
     @staticmethod
     def _save_locks(locks):
-        with open(LOCKS_FILE, 'w', encoding='utf-8') as f:
+        locks_file = _get_locks_file()
+        with open(locks_file, 'w', encoding='utf-8') as f:
             json.dump(locks, f, ensure_ascii=False, indent=2)
 
     @staticmethod

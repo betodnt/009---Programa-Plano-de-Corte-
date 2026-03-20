@@ -1,5 +1,6 @@
 import os
 import configparser
+from datetime import datetime
 
 # Get the absolute path to the project root directory
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,6 +11,31 @@ class ConfigManager:
     @staticmethod
     def _resolve_path(path_str):
         """Converte caminhos relativos em absolutos, preservando caminhos de rede (UNC)"""
+        now = datetime.now()
+
+        # Substituição dinâmica de data (ex: {date} -> 19-03-2026)
+        if '{date}' in path_str:
+            # Formato padrão ISO (YYYY-MM-DD)
+            path_str = path_str.replace('{date}', now.strftime("%Y-%m-%d"))
+
+        if '{date_br}' in path_str:
+            # Formato brasileiro (DD-MM-YYYY)
+            path_str = path_str.replace('{date_br}', now.strftime("%d-%m-%Y"))
+
+        if '{year}' in path_str:
+            path_str = path_str.replace('{year}', now.strftime("%Y"))
+        if '{month}' in path_str:
+            path_str = path_str.replace('{month}', now.strftime("%m"))
+        if '{day}' in path_str:
+            path_str = path_str.replace('{day}', now.strftime("%d"))
+        if '{month_name}' in path_str:
+            months_pt = {
+                1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+                5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+                9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+            }
+            path_str = path_str.replace('{month_name}', months_pt[now.month])
+
         if path_str.startswith('./'):
             return os.path.join(PROJECT_ROOT, path_str[2:])
         # Se for um caminho UNC (\\servidor\pasta), retorna como está
@@ -26,9 +52,10 @@ class ConfigManager:
             'SaidasCnc': './Public/saidas_cnc',
             'SaidasCortadas': r'V:\8. CONTROLE DE PRODUÇÃO\2. SAÍDAS CORTADAS',
             'PlanoCorte': './Public/plano_corte',
-            'DadosXml': r'V:\8. CONTROLE DE PRODUÇÃO\3. DADOS/dados_{date}.xml' # Template placeholder
+            'DadosXml': r'V:\8. CONTROLE DE PRODUÇÃO\3. DADOS/dados_{date}.xml', # Template placeholder
+            'LocksFile': './active_locks.json'
         }
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
+        with open(CONFIG_FILE, 'w', encoding='utf-8-sig') as configfile:
             config.write(configfile)
 
     @staticmethod
@@ -38,7 +65,7 @@ class ConfigManager:
             return
             
         config = configparser.ConfigParser()
-        config.read(CONFIG_FILE, encoding='utf-8')
+        config.read(CONFIG_FILE, encoding='utf-8-sig')
         
         # Check if missing key
         if not config.has_section('Paths') or not config.has_option('Paths', 'SaidasCnc'):
@@ -48,7 +75,7 @@ class ConfigManager:
     def _get_path(key, default_val):
         config = configparser.ConfigParser()
         if os.path.exists(CONFIG_FILE):
-            config.read(CONFIG_FILE, encoding='utf-8')
+            config.read(CONFIG_FILE, encoding='utf-8-sig')
             if config.has_section('Paths'):
                 path = config.get('Paths', key, fallback=default_val).strip('"').strip("'")
                 return ConfigManager._resolve_path(path)
@@ -68,16 +95,12 @@ class ConfigManager:
 
     @staticmethod
     def get_k8_data_path():
-        from datetime import datetime
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        
         # We want to force daily files, so we check if the config has a template or just use daily default
         config_val = ConfigManager._get_path('DadosXml', '')
-        if config_val and '{date}' in config_val:
-            return config_val.replace('{date}', date_str)
             
         # If config has a static "dados.xml", we override it to be daily
         if not config_val or config_val.endswith('dados.xml'):
+            date_str = datetime.now().strftime("%Y-%m-%d")
             return ConfigManager._resolve_path(f'./public/dados/dados_{date_str}.xml')
             
         return config_val
@@ -87,13 +110,17 @@ class ConfigManager:
         return ConfigManager._get_path('PlanoCorte', './public/plano_corte')
 
     @staticmethod
+    def get_locks_file_path():
+        return ConfigManager._get_path('LocksFile', './active_locks.json')
+
+    @staticmethod
     def get_all_settings():
         """Retorna todos os caminhos configurados no config.ini como um dicionário"""
         if not os.path.exists(CONFIG_FILE):
             ConfigManager._create_default_config()
 
         config = configparser.ConfigParser()
-        config.read(CONFIG_FILE, encoding='utf-8')
+        config.read(CONFIG_FILE, encoding='utf-8-sig')
         
         settings = {}
         if config.has_section('Paths'):
@@ -106,7 +133,7 @@ class ConfigManager:
         """Salva as configurações atualizadas no config.ini"""
         config = configparser.ConfigParser()
         if os.path.exists(CONFIG_FILE):
-            config.read(CONFIG_FILE, encoding='utf-8')
+            config.read(CONFIG_FILE, encoding='utf-8-sig')
             
         if not config.has_section('Paths'):
             config.add_section('Paths')
@@ -114,5 +141,5 @@ class ConfigManager:
         for key, value in new_settings.items():
             config.set('Paths', key, str(value))
 
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
+        with open(CONFIG_FILE, 'w', encoding='utf-8-sig') as configfile:
             config.write(configfile)

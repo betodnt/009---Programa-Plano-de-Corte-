@@ -46,6 +46,19 @@ def test_get_all_settings(temp_config_file):
     assert isinstance(settings, dict)
     assert "acervosaidascnc" in settings
 
+
+def test_resolve_path_date_br(temp_config_file):
+    resolved = ConfigManager._resolve_path(r"C:\\base\\{year}\\{month} - {month_name}\\{date_br}")
+    now = __import__('datetime').datetime.now()
+    months_pt = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+    }
+    expected = os.path.normpath(f"C:\\base\\{now.strftime('%Y')}\\{now.strftime('%m')} - {months_pt[now.month]}\\{now.strftime('%d-%m-%Y')}")
+    assert os.path.normpath(resolved) == expected
+
+
 def test_save_settings(temp_config_file):
     new_settings = {"AcervoSaidasCNC": "new_path", "SaidasCnc": "./new_saidas"}
     ConfigManager.save_settings(new_settings)

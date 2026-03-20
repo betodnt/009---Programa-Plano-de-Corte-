@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Dados><Entrada><Pedido>P001</Pedido><Operador>Joao</Operador><Maquina>Bodor1</Maquina><Chapa>Chapa</Chapa><Saida>saida01.cnc</Saida><Tipo>Pedido</Tipo><DataHoraInicio>2024-01-01 08:00:00</DataHoraInicio><Instancia>14484</Instancia><DataHoraTermino>2024-01-01 09:00:00</DataHoraTermino><TempoDecorrido>01:00:00</TempoDecorrido></Entrada></Dados>

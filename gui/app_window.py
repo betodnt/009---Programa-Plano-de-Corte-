@@ -1,11 +1,10 @@
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
+import logging
 import webbrowser
 from datetime import datetime
 import sys
-import threading
-import time
 
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -90,7 +89,6 @@ class AppWindow(tk.Tk):
 
         self.after(500, self._refresh_recent_operators)
         self.after(1000, self._update_saidas_if_needed)
-        self.after(0, self.history_panel.refresh_history)
 
     def _update_saidas_if_needed(self):
         try:
@@ -180,7 +178,7 @@ class AppWindow(tk.Tk):
                 except Exception:
                     pass
             except Exception as e:
-                print(f"Erro ao carregar ícone: {e}")
+                logging.error(f"Erro ao carregar ícone: {e}")
 
     def open_settings(self):
         config_win = ConfigDialog(self)
@@ -300,13 +298,13 @@ class AppWindow(tk.Tk):
                 if success_title == "INICIADO":
                     # Save entrada after successful copy
                     dados = self.form_panel.get_data()
+                    saida = dados["saida"]
                     dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
                     file_path = ConfigManager.get_k8_data_path()
                     DatabaseManager.save_entrada(
                         file_path, dados["pedido"], dados["operador"], dados["maquina"],
                         dados["retalho"], saida, dados["tipo"], dt_inicio)
                     self.show_toast("Corte Iniciado!")
-                    saida = self.form_panel.get_data()["saida"]
                     if saida:
                         nif_path = os.path.join(ConfigManager.get_server_path(),
                                                 saida.replace(".cnc", ".nif"))
@@ -317,10 +315,11 @@ class AppWindow(tk.Tk):
                     dados = self.form_panel.get_data()
                     dt_termino = self.end_time.strftime("%Y-%m-%d %H:%M:%S")
                     file_path = ConfigManager.get_k8_data_path()
-                    DatabaseManager.save_termino(
+                    ok, err = DatabaseManager.save_termino(
                         file_path, dados["pedido"], dados["operador"], dados["maquina"], dt_termino, self.elapsed_time)
                     LocksManager.release_lock(dados["maquina"], dados["saida"])
                     self.form_panel.update_saidas(self.form_panel._all_saidas)
+                    self.history_panel.current_operator = dados["operador"]
                     self.history_panel.refresh_history()
                     self.form_panel.enable_fields()
                     self.action_panel.btn_iniciar.state(['!disabled'])
@@ -378,6 +377,10 @@ class AppWindow(tk.Tk):
         self.end_time = datetime.now()
         self.elapsed_time = self.action_panel.get_elapsed_time_string()
 
+        # Desabilita botões para evitar clique duplo enquanto processa
+        self.action_panel.btn_finalizar.state(['disabled'])
+        self.form_panel.disable_fields()
+
         src_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
         dst_path = os.path.join(ConfigManager.get_saidas_cortadas_path(), saida)
 
@@ -386,17 +389,42 @@ class AppWindow(tk.Tk):
                                                  lambda e: self.on_file_op_finished(e, "Corte Finalizado com sucesso!"))
         self.active_runner.start()
 
-        self.after(600, lambda: self.history_panel.set_operator(self.form_panel.get_data()["operador"]))
         self.after(700, self._refresh_recent_operators)
 
     def handle_open_pdf(self):
-        saida = self.form_panel.get_data()["saida"]
-        if not saida:
+        dados = self.form_panel.get_data()
+        saida = dados["saida"]
+        pedido = dados["pedido"]
+        
+        if not saida and not pedido:
             return
-        pdf_name = saida.replace(".cnc", ".pdf")
+
+        # Cria lista de possíveis nomes para o PDF
+        potential_names = []
+        
+        # 1. Tenta pelo nome exato do arquivo CNC (ex: P123_Peca.cnc -> P123_Peca.pdf)
+        if saida:
+            base_name = os.path.splitext(os.path.basename(saida))[0]
+            potential_names.append(f"{base_name}.pdf")
+        
+        # 2. Tenta pelo número do pedido (ex: 12345.pdf) e variações comuns (P12345.pdf)
+        if pedido:
+            potential_names.append(f"{pedido}.pdf")
+            potential_names.append(f"P{pedido}.pdf")
+            potential_names.append(f"PEDIDO {pedido}.pdf")
+            
+        # Remove duplicatas mantendo a ordem
+        targets = list(dict.fromkeys(potential_names))
+
+        logging.info(f"Iniciando busca de PDF. Alvos: {targets}")
         self.progress_win = ProgressDialog(self, title="Procurando PDF na Rede...", max_val=0)
-        search_path = ConfigManager.get_server_path()
-        self.active_runner = SearchPdfRunner(pdf_name, search_path, self.on_pdf_search_finished)
+
+        search_path = ConfigManager.get_plano_corte_path()
+        if not os.path.exists(search_path):
+            # Fallback para o caminho clássico, caso o usuário não tenha configurado PlanoCorte
+            search_path = ConfigManager.get_server_path()
+
+        self.active_runner = SearchPdfRunner(targets, search_path, self.on_pdf_search_finished)
         self._check_runner_cancel()
         self.active_runner.start()
 
@@ -404,12 +432,35 @@ class AppWindow(tk.Tk):
         def finalize():
             if self.progress_win:
                 self.progress_win.close()
+
             if not found_path and not (self.progress_win and self.progress_win.is_canceled):
                 messagebox.showwarning("Não Encontrado", "O arquivo PDF correspondente não foi encontrado na base.")
             elif found_path:
-                webbrowser.open(f"file://{found_path}")
+                logging.info(f"PDF encontrado: {found_path}")
+                final_path = os.path.normpath(os.path.abspath(found_path))
+                try:
+                    if os.path.exists(final_path):
+                        import ctypes
+                        # 3 = SW_SHOWMAXIMIZED (Abre a janela maximizada)
+                        ctypes.windll.shell32.ShellExecuteW(None, "open", final_path, None, None, 3)
+                        return
+                except Exception as e:
+                    logging.error(f"Erro ao abrir PDF maximizado: {e}")
+
+                try:
+                    from pathlib import Path
+                    webbrowser.open(Path(final_path).as_uri())
+                except Exception as e:
+                    logging.error(f"Erro ao abrir PDF com webbrowser: {e}")
+                    try:
+                        webbrowser.open(f"file://{final_path}")
+                    except Exception as e:
+                        logging.error(f"Erro final ao abrir PDF: {e}")
+                        messagebox.showerror("Erro", f"Não foi possível abrir o PDF: {e}")
+
             self.active_runner = None
             self.progress_win = None
+
         self.after_idle(finalize)
 
     def _on_operator_changed(self, event=None):

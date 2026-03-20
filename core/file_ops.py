@@ -1,5 +1,6 @@
 import shutil
 import threading
+import logging
 import os
 
 class FileOperationRunner:
@@ -27,5 +28,6 @@ class FileOperationRunner:
             if self.on_finished:
                 self.on_finished("")
         except Exception as e:
+            logging.error(f"Erro na operação de arquivo ({self.op_type}): {e}", exc_info=True)
             if self.on_finished:
                 self.on_finished(f"Falha na operação: {str(e)}")

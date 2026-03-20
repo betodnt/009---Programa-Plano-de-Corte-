@@ -8,7 +8,13 @@ from typing import cast, Any
 import time
 import json
 
-LOCKS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "active_locks.json")
+def _get_locks_file():
+    try:
+        from core.config import ConfigManager
+        return ConfigManager.get_locks_file_path()
+    except Exception:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "active_locks.json")
+
 LOCK_TIMEOUT = 3600
 REFRESH_INTERVAL_MS = 2000
 
@@ -40,10 +46,11 @@ def _pid_alive(pid):
 
 
 def load_active_locks():
-    if not os.path.exists(LOCKS_FILE):
+    locks_file = _get_locks_file()
+    if not os.path.exists(locks_file):
         return {}
     try:
-        with open(LOCKS_FILE, "r", encoding="utf-8") as f:
+        with open(locks_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         now = time.time()
         valid = {}
@@ -60,7 +67,7 @@ def load_active_locks():
             valid[k] = v
         if stale:
             try:
-                with open(LOCKS_FILE, "w", encoding="utf-8") as f:
+                with open(locks_file, "w", encoding="utf-8") as f:
                     json.dump(valid, f, ensure_ascii=False, indent=2)
             except Exception:
                 pass
@@ -189,7 +196,7 @@ class MonitorApp(tk.Tk):
 
         footer = ttk.Frame(self, padding=(16, 6))
         footer.pack(fill="x")
-        ttk.Label(footer, text="Atualiza a cada 2 segundos  |  Arquivo: active_locks.json",
+        ttk.Label(footer, text=f"Atualiza a cada 2 segundos  |  Arquivo: {_get_locks_file()}",
                   style="Dim.TLabel").pack(side="left")
 
     def _schedule_refresh(self):
