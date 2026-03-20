@@ -86,18 +86,29 @@ class FormPanel(ttk.Frame):
         locked_saidas = LocksManager.get_locked_saidas(maquina)
         
         available_saidas = [s for s in self._all_saidas if s not in locked_saidas]
+        current_selection = self.var_saida.get()
         
-        self.cbox_saida['values'] = available_saidas
-        if available_saidas:
-            self.cbox_saida.current(0)
-            # Enable iniciar button
-            if hasattr(self.master, 'action_panel'):
-                self.master.action_panel.btn_iniciar.state(['!disabled'])
-        else:
-            self.var_saida.set('')
-            # Disable iniciar button
-            if hasattr(self.master, 'action_panel'):
-                self.master.action_panel.btn_iniciar.state(['disabled'])
+        # Só atualiza a lista visual se houver diferença para evitar piscar ou fechar o dropdown aberto
+        if list(self.cbox_saida['values']) != available_saidas:
+            self.cbox_saida['values'] = available_saidas
+            
+            # Tenta preservar a seleção atual se ela ainda estiver disponível
+            if current_selection and current_selection in available_saidas:
+                self.var_saida.set(current_selection)
+            elif available_saidas:
+                self.cbox_saida.current(0)
+            else:
+                self.var_saida.set('')
+
+        # Atualiza estado do botão Iniciar
+        if hasattr(self.master, 'action_panel'):
+            # Se tem saídas e uma está selecionada (ou a primeira foi auto-selecionada)
+            if available_saidas and self.var_saida.get():
+                if self.master.action_panel.btn_iniciar.state() != ('!disabled',):
+                     self.master.action_panel.btn_iniciar.state(['!disabled'])
+            else:
+                if self.master.action_panel.btn_iniciar.state() != ('disabled',):
+                    self.master.action_panel.btn_iniciar.state(['disabled'])
 
     def update_operators(self, names):
         self.cbox_operador['values'] = names

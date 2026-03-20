@@ -1,5 +1,6 @@
 import os
 import threading
+import logging
 
 class SearchFilesRunner:
     def __init__(self, pedido, tipo, base_path, on_progress_update, on_finished):
@@ -21,7 +22,8 @@ class SearchFilesRunner:
         results = []
         try:
             files = [f for f in os.listdir(self.base_path) if f.lower().endswith(".cnc")]
-        except Exception:
+        except Exception as e:
+            logging.error(f"Erro ao listar arquivos em {self.base_path}: {e}")
             if self.on_finished: self.on_finished(results)
             return
 

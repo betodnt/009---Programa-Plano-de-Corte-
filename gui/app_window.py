@@ -5,6 +5,7 @@ import logging
 import webbrowser
 from datetime import datetime
 import sys
+from typing import Any, cast
 
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -153,12 +154,12 @@ class AppWindow(tk.Tk):
 
         style.element_create("My.Vertical.Scrollbar.trough", "from", "default")
         style.element_create("My.Vertical.Scrollbar.thumb", "from", "default")
-        style.layout("My.Vertical.TScrollbar", [
+        style.layout("My.Vertical.TScrollbar", cast(Any, [
             ('My.Vertical.Scrollbar.trough', {
-                'children': [('My.Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nswe'})],
+                'children': [('My.Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nsew'})],
                 'sticky': 'ns'
             })
-        ])
+        ]))
         style.configure("My.Vertical.TScrollbar",
             background="#444444", troughcolor=bg_dark, borderwidth=0, arrowsize=0, width=8)
         style.map("My.Vertical.TScrollbar",
