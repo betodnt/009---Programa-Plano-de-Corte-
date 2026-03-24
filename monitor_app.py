@@ -107,6 +107,11 @@ class MonitorApp(tk.Tk):
         self.title("Monitor de Operacoes em Tempo Real")
         self.geometry("820x500")
         self.minsize(600, 350)
+        # iniciar maximizado para aproveitar o espaço e responsividade
+        try:
+            self.state("zoomed")
+        except Exception:
+            pass
         self.configure(bg=BG_DARK)
 
         today = datetime.now().strftime("%d/%m/%Y")
@@ -116,7 +121,38 @@ class MonitorApp(tk.Tk):
         self._setup_styles()
         self._build_ui()
         self._load_icon()
+
+        # Responsividade: ajusta colunas do treeview ao redimensionar
+        self.bind("<Configure>", self._on_resize)
+
         self._schedule_refresh()
+
+    def _on_resize(self, event=None):
+        # Pode ser invocado antes dos widgets estarem prontos
+        if not hasattr(self, 'tree') or not self.tree.winfo_ismapped():
+            return
+        self._adjust_tree_columns()
+
+    def _adjust_tree_columns(self):
+        try:
+            total = self.tree.winfo_width()
+            if total <= 100:
+                return
+            # Proporções de coluna (soma = 1.0)
+            ratios = {
+                'operador': 0.22,
+                'maquina': 0.15,
+                'pedido': 0.12,
+                'plano': 0.34,
+                'duracao': 0.10,
+                'conclusao': 0.07,
+            }
+            # Ajusta largura de cada coluna mantendo a proporção
+            for col, ratio in ratios.items():
+                width = max(60, int(total * ratio))
+                self.tree.column(col, width=width, stretch=True)
+        except Exception:
+            pass
 
     def _load_icon(self):
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -224,11 +260,11 @@ class MonitorApp(tk.Tk):
         self.tree.heading("conclusao", text="CONCLUSAO")
 
         self.tree.column("operador", width=160, anchor="w", stretch=True)
-        self.tree.column("maquina",  width=130, anchor="center", stretch=False)
-        self.tree.column("pedido",   width=100, anchor="center", stretch=False)
+        self.tree.column("maquina",  width=130, anchor="center", stretch=True)
+        self.tree.column("pedido",   width=100, anchor="center", stretch=True)
         self.tree.column("plano",    width=220, anchor="w", stretch=True)
-        self.tree.column("duracao",  width=90,  anchor="center", stretch=False)
-        self.tree.column("conclusao", width=90, anchor="center", stretch=False)
+        self.tree.column("duracao",  width=90,  anchor="center", stretch=True)
+        self.tree.column("conclusao", width=90, anchor="center", stretch=True)
 
         self.tree.tag_configure("active", foreground=GREEN)
         self.tree.tag_configure("idle",   foreground=FG_DIM)
