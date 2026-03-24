@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.ini', '.'), ('Public', 'Public'), ('icon.png', '.'), ('icon.ico', '.')],
+    datas=[('config.ini', '.'), ('Public', 'Public'), ('icon.png', '.')],
     hiddenimports=['xml.etree.ElementTree', 'webbrowser', 'threading', 'configparser', 'datetime', 'time', 'os', 'shutil', 'xml.dom.minidom'],
     hookspath=[],
     hooksconfig={},
@@ -32,7 +32,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
 )
 coll = COLLECT(
     exe,

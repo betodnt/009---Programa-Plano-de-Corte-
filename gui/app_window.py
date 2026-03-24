@@ -1,11 +1,11 @@
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
-import logging
 import webbrowser
 from datetime import datetime
 import sys
-from typing import Any, cast
+import threading
+import time
 
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -154,12 +154,12 @@ class AppWindow(tk.Tk):
 
         style.element_create("My.Vertical.Scrollbar.trough", "from", "default")
         style.element_create("My.Vertical.Scrollbar.thumb", "from", "default")
-        style.layout("My.Vertical.TScrollbar", cast(Any, [
+        style.layout("My.Vertical.TScrollbar", [
             ('My.Vertical.Scrollbar.trough', {
-                'children': [('My.Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nsew'})],
+                'children': [('My.Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nswe'})],
                 'sticky': 'ns'
             })
-        ]))
+        ])
         style.configure("My.Vertical.TScrollbar",
             background="#444444", troughcolor=bg_dark, borderwidth=0, arrowsize=0, width=8)
         style.map("My.Vertical.TScrollbar",
@@ -169,21 +169,20 @@ class AppWindow(tk.Tk):
         base_dir = os.path.dirname(os.path.dirname(__file__))
         icon_path = os.path.join(base_dir, "icon.png")
         icon_ico_path = os.path.join(base_dir, "icon.ico")
-        if os.path.exists(icon_path):
-            try:
+        try:
+            if os.path.exists(icon_path):
                 self.icon_photo = tk.PhotoImage(file=icon_path)
                 self.iconphoto(True, self.icon_photo)
-                try:
-                    if os.path.exists(icon_ico_path):
-                        self.iconbitmap(icon_ico_path)
-                except Exception:
-                    pass
-            except Exception as e:
-                logging.error(f"Erro ao carregar ícone: {e}")
+            if os.path.exists(icon_ico_path):
+                self.iconbitmap(icon_ico_path)
+        except Exception as e:
+            print(f"Erro ao carregar ícone: {e}")
 
     def open_settings(self):
         config_win = ConfigDialog(self)
         self.wait_window(config_win)
+        # Atualizar a exibição da máquina após fechar as configurações
+        self.form_panel.update_machine_display()
 
     def _build_ui(self):
         main_container = ttk.Frame(self, padding="10")
@@ -198,7 +197,6 @@ class AppWindow(tk.Tk):
         self.form_panel = FormPanel(right_panel, self.handle_search, self.handle_open_pdf, self.open_settings)
         self.form_panel.pack(fill="x", pady=(0, 20))
         self.form_panel.cbox_operador.bind("<<ComboboxSelected>>", self._on_operator_changed)
-        self.form_panel.cbox_operador.bind("<FocusOut>", self._on_operator_changed)
 
         ttk.Frame(right_panel).pack(fill="both", expand=True)
 
@@ -297,7 +295,7 @@ class AppWindow(tk.Tk):
                 messagebox.showwarning("Aviso de Rede", err_msg)
             else:
                 if success_title == "INICIADO":
-                    # Save entrada after successful copy
+                    # Salva a entrada após a cópia bem-sucedida
                     dados = self.form_panel.get_data()
                     saida = dados["saida"]
                     dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -312,7 +310,7 @@ class AppWindow(tk.Tk):
                         if os.path.exists(nif_path):
                             webbrowser.open(f"file://{nif_path}")
                 else:
-                    # Save termino after successful move
+                    # Salva o término após a movimentação bem-sucedida
                     dados = self.form_panel.get_data()
                     dt_termino = self.end_time.strftime("%Y-%m-%d %H:%M:%S")
                     file_path = ConfigManager.get_k8_data_path()
@@ -378,10 +376,6 @@ class AppWindow(tk.Tk):
         self.end_time = datetime.now()
         self.elapsed_time = self.action_panel.get_elapsed_time_string()
 
-        # Desabilita botões para evitar clique duplo enquanto processa
-        self.action_panel.btn_finalizar.state(['disabled'])
-        self.form_panel.disable_fields()
-
         src_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
         dst_path = os.path.join(ConfigManager.get_saidas_cortadas_path(), saida)
 
@@ -393,39 +387,13 @@ class AppWindow(tk.Tk):
         self.after(700, self._refresh_recent_operators)
 
     def handle_open_pdf(self):
-        dados = self.form_panel.get_data()
-        saida = dados["saida"]
-        pedido = dados["pedido"]
-        
-        if not saida and not pedido:
+        saida = self.form_panel.get_data()["saida"]
+        if not saida:
             return
-
-        # Cria lista de possíveis nomes para o PDF
-        potential_names = []
-        
-        # 1. Tenta pelo nome exato do arquivo CNC (ex: P123_Peca.cnc -> P123_Peca.pdf)
-        if saida:
-            base_name = os.path.splitext(os.path.basename(saida))[0]
-            potential_names.append(f"{base_name}.pdf")
-        
-        # 2. Tenta pelo número do pedido (ex: 12345.pdf) e variações comuns (P12345.pdf)
-        if pedido:
-            potential_names.append(f"{pedido}.pdf")
-            potential_names.append(f"P{pedido}.pdf")
-            potential_names.append(f"PEDIDO {pedido}.pdf")
-            
-        # Remove duplicatas mantendo a ordem
-        targets = list(dict.fromkeys(potential_names))
-
-        logging.info(f"Iniciando busca de PDF. Alvos: {targets}")
+        pdf_name = saida.replace(".cnc", ".pdf")
         self.progress_win = ProgressDialog(self, title="Procurando PDF na Rede...", max_val=0)
-
-        search_path = ConfigManager.get_plano_corte_path()
-        if not os.path.exists(search_path):
-            # Fallback para o caminho clássico, caso o usuário não tenha configurado PlanoCorte
-            search_path = ConfigManager.get_server_path()
-
-        self.active_runner = SearchPdfRunner(targets, search_path, self.on_pdf_search_finished)
+        search_path = ConfigManager.get_server_path()
+        self.active_runner = SearchPdfRunner(pdf_name, search_path, self.on_pdf_search_finished)
         self._check_runner_cancel()
         self.active_runner.start()
 
@@ -433,35 +401,12 @@ class AppWindow(tk.Tk):
         def finalize():
             if self.progress_win:
                 self.progress_win.close()
-
             if not found_path and not (self.progress_win and self.progress_win.is_canceled):
                 messagebox.showwarning("Não Encontrado", "O arquivo PDF correspondente não foi encontrado na base.")
             elif found_path:
-                logging.info(f"PDF encontrado: {found_path}")
-                final_path = os.path.normpath(os.path.abspath(found_path))
-                try:
-                    if os.path.exists(final_path):
-                        import ctypes
-                        # 3 = SW_SHOWMAXIMIZED (Abre a janela maximizada)
-                        ctypes.windll.shell32.ShellExecuteW(None, "open", final_path, None, None, 3)
-                        return
-                except Exception as e:
-                    logging.error(f"Erro ao abrir PDF maximizado: {e}")
-
-                try:
-                    from pathlib import Path
-                    webbrowser.open(Path(final_path).as_uri())
-                except Exception as e:
-                    logging.error(f"Erro ao abrir PDF com webbrowser: {e}")
-                    try:
-                        webbrowser.open(f"file://{final_path}")
-                    except Exception as e:
-                        logging.error(f"Erro final ao abrir PDF: {e}")
-                        messagebox.showerror("Erro", f"Não foi possível abrir o PDF: {e}")
-
+                webbrowser.open(f"file://{found_path}")
             self.active_runner = None
             self.progress_win = None
-
         self.after_idle(finalize)
 
     def _on_operator_changed(self, event=None):
@@ -471,3 +416,15 @@ class AppWindow(tk.Tk):
     def _refresh_recent_operators(self):
         operators = OperatorsManager.get_recent_operators(10)
         self.form_panel.update_operators(operators)
+        
+        if operators:
+            # Seleciona o operador mais recente automaticamente
+            self.form_panel.cbox_operador.current(0)
+            # Força a atualização da variável para garantir que o _on_operator_changed receba o valor
+            self.form_panel.var_operador.set(operators[0])
+            self._on_operator_changed()
+
+        # Carrega a visualização do histórico diário ao iniciar
+        # Um pequeno delay garante que a interface gráfica esteja pronta antes de buscar os dados
+        if hasattr(self.history_panel, 'refresh_history'):
+            self.after(200, self.history_panel.refresh_history)

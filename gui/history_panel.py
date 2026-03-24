@@ -1,22 +1,20 @@
 import tkinter as tk
 from tkinter import ttk
-import logging
 import xml.etree.ElementTree as ET
 import os
+import threading
 
 class HistoryPanel(ttk.Frame):
     def __init__(self, master, get_xml_path_func, **kwargs):
         super().__init__(master, **kwargs)
         self.get_xml_path_func = get_xml_path_func
         self.current_operator = ""
+        self._loading = False
         self.setup_ui()
-        # Removed refresh_history() from here to speed up startup
 
     def set_operator(self, operator_name):
-        """Define o operador atual para filtrar o histórico."""
-        if operator_name != self.current_operator:
-            self.current_operator = operator_name
-            self.refresh_history()
+        self.current_operator = operator_name
+        self.refresh_history()
 
     def setup_ui(self):
         self.columnconfigure(0, weight=1)
@@ -51,30 +49,36 @@ class HistoryPanel(ttk.Frame):
             self.scrollbar.grid(row=1, column=1, sticky="ns")
 
     def refresh_history(self):
+        if self._loading:
+            return
+        self._loading = True
+        threading.Thread(target=self._load_history_data, daemon=True).start()
+
+    def _load_history_data(self):
+        xml_path = self.get_xml_path_func()
+        rows = []
+        if os.path.exists(xml_path):
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+                operator = self.current_operator.strip()
+                for entrada in root.findall("Entrada"):
+                    op = entrada.findtext("Operador", "").strip()
+                    if operator and op.lower() != operator.lower():
+                        continue
+                    pedido = entrada.findtext("Pedido", "")
+                    saida = entrada.findtext("Saida", "")
+                    tempo = entrada.findtext("TempoDecorrido", "")
+                    if tempo:
+                        rows.append((pedido, saida, tempo))
+            except Exception as e:
+                print(f"Error reading history XML: {e}")
+        self.after(0, lambda: self._apply_history_rows(rows))
+
+    def _apply_history_rows(self, rows):
         for item in self.tree.get_children():
             self.tree.delete(item)
-
-        xml_path = self.get_xml_path_func()
-        if not os.path.exists(xml_path):
-            return
-
-        operator = self.current_operator.strip()
-
-        try:
-            tree = ET.parse(xml_path)
-            root = tree.getroot()
-
-            for entrada in root.findall("Entrada"):
-                op = entrada.findtext("Operador", "").strip()
-                if operator and op.lower() != operator.lower():
-                    continue
-                pedido = entrada.findtext("Pedido", "")
-                saida = entrada.findtext("Saida", "")
-                tempo = entrada.findtext("TempoDecorrido", "")
-
-                if tempo:
-                    self.tree.insert("", "end", values=(pedido, saida, tempo))
-
-            self.after(100, self.update_scrollbar)
-        except Exception as e:
-            logging.error(f"Erro ao ler histórico XML: {e}")
+        for row in rows:
+            self.tree.insert("", "end", values=row)
+        self._loading = False
+        self.after(100, self.update_scrollbar)

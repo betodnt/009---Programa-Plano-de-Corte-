@@ -1,41 +1,17 @@
 import os
 import configparser
-from datetime import datetime
 
-# Get the absolute path to the project root directory
+# Obtém o caminho absoluto para o diretório raiz do projeto
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.ini")
 
 class ConfigManager:
+    _config_cache = None
+
     @staticmethod
     def _resolve_path(path_str):
         """Converte caminhos relativos em absolutos, preservando caminhos de rede (UNC)"""
-        now = datetime.now()
-
-        # Substituição dinâmica de data (ex: {date} -> 19-03-2026)
-        if '{date}' in path_str:
-            # Formato padrão ISO (YYYY-MM-DD)
-            path_str = path_str.replace('{date}', now.strftime("%Y-%m-%d"))
-
-        if '{date_br}' in path_str:
-            # Formato brasileiro (DD-MM-YYYY)
-            path_str = path_str.replace('{date_br}', now.strftime("%d-%m-%Y"))
-
-        if '{year}' in path_str:
-            path_str = path_str.replace('{year}', now.strftime("%Y"))
-        if '{month}' in path_str:
-            path_str = path_str.replace('{month}', now.strftime("%m"))
-        if '{day}' in path_str:
-            path_str = path_str.replace('{day}', now.strftime("%d"))
-        if '{month_name}' in path_str:
-            months_pt = {
-                1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-                5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-                9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
-            }
-            path_str = path_str.replace('{month_name}', months_pt[now.month])
-
         if path_str.startswith('./'):
             return os.path.join(PROJECT_ROOT, path_str[2:])
         # Se for um caminho UNC (\\servidor\pasta), retorna como está
@@ -47,38 +23,49 @@ class ConfigManager:
     def _create_default_config():
         config = configparser.ConfigParser()
         config['Paths'] = {
-            # Use a raw string so backslashes are not treated as escape sequences.
+            # Use uma string raw para que as barras invertidas não sejam tratadas como sequências de escape.
             'AcervoSaidasCNC': r'V:\8. CONTROLE DE PRODUÇÃO\1. SAÍDAS A CORTAR',
             'SaidasCnc': './Public/saidas_cnc',
             'SaidasCortadas': r'V:\8. CONTROLE DE PRODUÇÃO\2. SAÍDAS CORTADAS',
             'PlanoCorte': './Public/plano_corte',
-            'DadosXml': r'V:\8. CONTROLE DE PRODUÇÃO\3. DADOS/dados_{date}.xml', # Template placeholder
+            'DadosXml': r'V:\8. CONTROLE DE PRODUÇÃO\3. DADOS/dados_{date}.xml', # Placeholder para template
             'LocksFile': './active_locks.json'
         }
-        with open(CONFIG_FILE, 'w', encoding='utf-8-sig') as configfile:
+        config['Machine'] = {
+            'current_machine': 'Bodor1 (12K)',
+            'available_machines': 'Bodor1 (12K), Bodor2 (6K), Bodor3 (4K), Trumpf1, Trumpf2'
+        }
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
+
+    @staticmethod
+    def _ensure_loaded():
+        """Garante que as configurações foram carregadas na memória"""
+        if ConfigManager._config_cache is None:
+            ConfigManager.load_settings()
 
     @staticmethod
     def load_settings():
         if not os.path.exists(CONFIG_FILE):
             ConfigManager._create_default_config()
-            return
             
         config = configparser.ConfigParser()
-        config.read(CONFIG_FILE, encoding='utf-8-sig')
+        config.read(CONFIG_FILE, encoding='utf-8')
         
-        # Check if missing key
+        # Verifica se falta alguma chave
         if not config.has_section('Paths') or not config.has_option('Paths', 'SaidasCnc'):
             ConfigManager._create_default_config()
+            config.read(CONFIG_FILE, encoding='utf-8')
+
+        ConfigManager._config_cache = config
 
     @staticmethod
     def _get_path(key, default_val):
-        config = configparser.ConfigParser()
-        if os.path.exists(CONFIG_FILE):
-            config.read(CONFIG_FILE, encoding='utf-8-sig')
-            if config.has_section('Paths'):
-                path = config.get('Paths', key, fallback=default_val).strip('"').strip("'")
-                return ConfigManager._resolve_path(path)
+        ConfigManager._ensure_loaded()
+        config = ConfigManager._config_cache
+        if config and config.has_section('Paths'):
+            path = config.get('Paths', key, fallback=default_val).strip('"').strip("'")
+            return ConfigManager._resolve_path(path)
         return ConfigManager._resolve_path(default_val)
 
     @staticmethod
@@ -95,12 +82,16 @@ class ConfigManager:
 
     @staticmethod
     def get_k8_data_path():
-        # We want to force daily files, so we check if the config has a template or just use daily default
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        
+        # Forçamos arquivos diários, então verificamos se a configuração tem um template ou usamos o padrão diário
         config_val = ConfigManager._get_path('DadosXml', '')
+        if config_val and '{date}' in config_val:
+            return config_val.replace('{date}', date_str)
             
-        # If config has a static "dados.xml", we override it to be daily
+        # Se a configuração tiver um "dados.xml" estático, nós o sobrescrevemos para ser diário
         if not config_val or config_val.endswith('dados.xml'):
-            date_str = datetime.now().strftime("%Y-%m-%d")
             return ConfigManager._resolve_path(f'./public/dados/dados_{date_str}.xml')
             
         return config_val
@@ -114,18 +105,51 @@ class ConfigManager:
         return ConfigManager._get_path('LocksFile', './active_locks.json')
 
     @staticmethod
+    def get_current_machine():
+        """Retorna a máquina atualmente selecionada"""
+        ConfigManager._ensure_loaded()
+        config = ConfigManager._config_cache
+        if config and config.has_section('Machine') and config.has_option('Machine', 'current_machine'):
+            machine = config.get('Machine', 'current_machine').strip('"').strip("'")
+            if machine:
+                return machine
+        # Fallback para a primeira máquina disponível
+        machines = ConfigManager.get_available_machines()
+        return machines[0] if machines else "Bodor1 (12K)"
+
+    @staticmethod
+    def get_available_machines():
+        """Retorna a lista de máquinas disponíveis"""
+        # Lista padrão de máquinas
+        default_machines = [
+            "Bodor1 (12K)",
+            "Bodor2 (6K)",
+            "Bodor3 (4K)",
+            "Trumpf1",
+            "Trumpf2"
+        ]
+        # Se houver máquinas configuradas no config.ini, usar elas
+        ConfigManager._ensure_loaded()
+        config = ConfigManager._config_cache
+        if config and config.has_section('Machine') and config.has_option('Machine', 'available_machines'):
+            machines_str = config.get('Machine', 'available_machines').strip('"').strip("'")
+            if machines_str:
+                return [m.strip() for m in machines_str.split(',')]
+        return default_machines
+
+    @staticmethod
     def get_all_settings():
         """Retorna todos os caminhos configurados no config.ini como um dicionário"""
-        if not os.path.exists(CONFIG_FILE):
-            ConfigManager._create_default_config()
-
-        config = configparser.ConfigParser()
-        config.read(CONFIG_FILE, encoding='utf-8-sig')
+        ConfigManager._ensure_loaded()
+        config = ConfigManager._config_cache
         
         settings = {}
         if config.has_section('Paths'):
             for key in config.options('Paths'):
                 settings[key] = config.get('Paths', key)
+        if config.has_section('Machine'):
+            for key in config.options('Machine'):
+                settings[key] = config.get('Machine', key)
         return settings
 
     @staticmethod
@@ -133,13 +157,21 @@ class ConfigManager:
         """Salva as configurações atualizadas no config.ini"""
         config = configparser.ConfigParser()
         if os.path.exists(CONFIG_FILE):
-            config.read(CONFIG_FILE, encoding='utf-8-sig')
+            config.read(CONFIG_FILE, encoding='utf-8')
             
         if not config.has_section('Paths'):
             config.add_section('Paths')
+        if not config.has_section('Machine'):
+            config.add_section('Machine')
 
         for key, value in new_settings.items():
-            config.set('Paths', key, str(value))
+            if key in ['current_machine', 'available_machines']:
+                config.set('Machine', key, str(value))
+            else:
+                config.set('Paths', key, str(value))
 
-        with open(CONFIG_FILE, 'w', encoding='utf-8-sig') as configfile:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
+            
+        # Recarrega as configurações na memória para atualizar o cache
+        ConfigManager.load_settings()

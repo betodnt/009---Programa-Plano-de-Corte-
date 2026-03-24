@@ -36,7 +36,7 @@ def build_exe():
         "--hidden-import=time",
         "--hidden-import=os",
         "--hidden-import=shutil",  # Para backup
-        "--hidden-import=xml.dom.minidom",  # Para pretty print
+        "--hidden-import=xml.dom.minidom",  # Para formatação de XML
         main_script
     ]
 

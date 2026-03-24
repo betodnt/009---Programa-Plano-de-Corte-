@@ -1,6 +1,5 @@
 import os
 import threading
-import logging
 
 class SearchFilesRunner:
     def __init__(self, pedido, tipo, base_path, on_progress_update, on_finished):
@@ -22,8 +21,7 @@ class SearchFilesRunner:
         results = []
         try:
             files = [f for f in os.listdir(self.base_path) if f.lower().endswith(".cnc")]
-        except Exception as e:
-            logging.error(f"Erro ao listar arquivos em {self.base_path}: {e}")
+        except Exception:
             if self.on_finished: self.on_finished(results)
             return
 
@@ -59,9 +57,8 @@ class SearchFilesRunner:
 
 
 class SearchPdfRunner:
-    def __init__(self, targets, start_path, on_finished):
-        # targets pode ser uma string única ou uma lista de strings
-        self.targets = [targets] if isinstance(targets, str) else targets
+    def __init__(self, pdf_filename, start_path, on_finished):
+        self.pdf_filename = pdf_filename
         self.start_path = start_path
         self._is_canceled = False
         self.on_finished = on_finished # callback(found_path)
@@ -75,20 +72,11 @@ class SearchPdfRunner:
 
     def run(self):
         found_path = ""
-        # Prepara targets em lowercase para comparação insensível a caixa
-        targets_lower = [t.lower() for t in self.targets]
-        
         for root, dirs, files in os.walk(self.start_path):
             if self._is_canceled:
                 break
-            
-            # Verifica cada arquivo na pasta contra a lista de targets
-            for f in files:
-                if f.lower() in targets_lower:
-                    found_path = os.path.join(root, f)
-                    break
-            
-            if found_path:
+            if self.pdf_filename in files:
+                found_path = os.path.join(root, self.pdf_filename)
                 break
                 
         if self.on_finished:

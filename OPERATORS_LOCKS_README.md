@@ -91,13 +91,13 @@ locked = LocksManager.get_locked_saidas("Bodor1 (12K)")
 
 - Persiste em JSON (facilita backup/compartilhamento)
 - Limite de 10 operadores históricos
-- Movidos para frente quando reutilizados (LRU - Least Recently Used)
+- Movidos para frente quando reutilizados (LRU - Least Recently Used / Menos Recentemente Usado)
 
 ### LocksManager
 
 - Cada lock é: `máquina|plano`
-- Locksum arquivo JSON compartilhado entre instâncias
-- PID (Process ID) garante que apenas o processo que criou o lock vê como "seu"
+- Locks em arquivo JSON compartilhado entre instâncias
+- PID (Process ID / Identificador de Processo) garante que apenas o processo que criou o lock vê como "seu"
 - Timeout automático: 1 hora (limpar locks de apps travadas)
 
 ## Arquivos de Dados
@@ -137,7 +137,7 @@ python test_multi_instance.py
 
 ## Possíveis Melhorias Futuras
 
-- [ ] Visualizar quem está usando qual máquina (modo "network")
+- [ ] Visualizar quem está usando qual máquina (modo "rede")
 - [ ] Timeout configurável via `config.ini`
 - [ ] Persistência em banco de dados (em vez de JSON)
 - [ ] Limite de tempo de lock personalizável por máquina

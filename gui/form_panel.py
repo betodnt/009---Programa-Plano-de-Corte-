@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from core.locks import LocksManager
+from core.config import ConfigManager
 
 class FormPanel(ttk.Frame):
     def __init__(self, master, on_search_trigger, on_open_pdf, on_open_settings, **kwargs):
@@ -13,13 +14,13 @@ class FormPanel(ttk.Frame):
         self.setup_ui()
 
     def setup_ui(self):
-        # Configure grid expansion
+        # Configura a expansão do grid
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
         self.columnconfigure(2, weight=0)
         self.columnconfigure(3, weight=0)
         
-        # Row-based layout for more space
+        # Layout baseado em linhas para mais espaço
         
         # Operador & Máquina
         lbl_op = ttk.Label(self, text="OPERADOR")
@@ -28,12 +29,10 @@ class FormPanel(ttk.Frame):
         self.cbox_operador = ttk.Combobox(self, textvariable=self.var_operador)
         self.cbox_operador.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 15))
 
-        lbl_maq = ttk.Label(self, text="MÁQUINA")
-        lbl_maq.grid(row=0, column=1, sticky="w", padx=10, pady=(10, 2))
-        self.var_maquina = tk.StringVar(value="Bodor1 (12K)")
-        self.cbox_maquina = ttk.Combobox(self, textvariable=self.var_maquina, state="readonly", values=["Bodor1 (12K)", "Bodor2 (6K)", "Dardi"])
-        self.cbox_maquina.grid(row=1, column=1, sticky="ew", padx=10, pady=(0, 15))
-        self.cbox_maquina.bind("<<ComboboxSelected>>", self._on_maquina_changed)
+        machine_name = ConfigManager.get_current_machine()
+        self.lbl_machine_value = ttk.Label(self, text=machine_name, font=("Segoe UI", 30, "bold"))
+        self.lbl_machine_value.grid(row=0, column=1, rowspan=2, sticky="ew", padx=20, pady=(10, 15))
+        self.var_maquina = tk.StringVar(value=machine_name)  # Mantém para compatibilidade
         
         # Botão de engrenagem à direita da máquina
         self.btn_settings = tk.Button(self, text="⚙", font=("Segoe UI", 22), fg="white", bg="#2b2b2b",
@@ -54,7 +53,6 @@ class FormPanel(ttk.Frame):
         self.var_pedido = tk.StringVar()
         self.ent_pedido = ttk.Entry(self, textvariable=self.var_pedido)
         self.ent_pedido.grid(row=3, column=1, sticky="ew", padx=10, pady=(0, 15))
-        self.ent_pedido.bind("<FocusOut>", lambda e: self.on_search_trigger())
         self.ent_pedido.bind("<Return>", lambda e: self.on_search_trigger())
 
         # Chapa/Retalho & Saída CNC
@@ -78,6 +76,12 @@ class FormPanel(ttk.Frame):
         self.btn_pdf = ttk.Button(frame_saida_controls, text="PDF", command=self.on_open_pdf, width=6)
         self.btn_pdf.pack(side="right")
 
+    def update_machine_display(self):
+        """Atualiza a exibição da máquina atual"""
+        machine_name = ConfigManager.get_current_machine()
+        self.lbl_machine_value.config(text=machine_name)
+        self.var_maquina.set(machine_name)
+
     def update_saidas(self, results):
         """Atualiza lista de saídas, filtrando as que estão bloqueadas"""
         self._all_saidas = list(results)
@@ -86,41 +90,29 @@ class FormPanel(ttk.Frame):
         locked_saidas = LocksManager.get_locked_saidas(maquina)
         
         available_saidas = [s for s in self._all_saidas if s not in locked_saidas]
-        current_selection = self.var_saida.get()
         
-        # Só atualiza a lista visual se houver diferença para evitar piscar ou fechar o dropdown aberto
-        if list(self.cbox_saida['values']) != available_saidas:
-            self.cbox_saida['values'] = available_saidas
-            
-            # Tenta preservar a seleção atual se ela ainda estiver disponível
-            if current_selection and current_selection in available_saidas:
-                self.var_saida.set(current_selection)
-            elif available_saidas:
-                self.cbox_saida.current(0)
-            else:
-                self.var_saida.set('')
-
-        # Atualiza estado do botão Iniciar
-        if hasattr(self.master, 'action_panel'):
-            # Se tem saídas e uma está selecionada (ou a primeira foi auto-selecionada)
-            if available_saidas and self.var_saida.get():
-                if self.master.action_panel.btn_iniciar.state() != ('!disabled',):
-                     self.master.action_panel.btn_iniciar.state(['!disabled'])
-            else:
-                if self.master.action_panel.btn_iniciar.state() != ('disabled',):
-                    self.master.action_panel.btn_iniciar.state(['disabled'])
+        self.cbox_saida['values'] = available_saidas
+        if available_saidas:
+            self.cbox_saida.current(0)
+            # Habilita o botão iniciar
+            if hasattr(self.master, 'action_panel'):
+                self.master.action_panel.btn_iniciar.state(['!disabled'])
+        else:
+            self.var_saida.set('')
+            # Desabilita o botão iniciar
+            if hasattr(self.master, 'action_panel'):
+                self.master.action_panel.btn_iniciar.state(['disabled'])
 
     def update_operators(self, names):
         self.cbox_operador['values'] = names
 
     def disable_fields(self):
-        for w in (self.cbox_operador, self.cbox_maquina, self.cbox_tipo, 
+        for w in (self.cbox_operador, self.cbox_tipo, 
                  self.ent_pedido, self.cbox_retalho, self.cbox_saida):
             w.config(state="disabled")
 
     def enable_fields(self):
         self.cbox_operador.config(state="normal")
-        self.cbox_maquina.config(state="readonly")
         self.cbox_tipo.config(state="readonly")
         self.ent_pedido.config(state="normal")
         self.cbox_retalho.config(state="readonly")
@@ -135,7 +127,3 @@ class FormPanel(ttk.Frame):
             "retalho": self.var_retalho.get(),
             "saida": self.var_saida.get()
         }
-    
-    def _on_maquina_changed(self, event=None):
-        """Callback quando máquina é mudada - refaz filtragem de saídas"""
-        self.update_saidas(self._all_saidas)

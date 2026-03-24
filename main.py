@@ -1,10 +1,5 @@
 import sys
 import os
-import traceback
-import logging
-from logging.handlers import RotatingFileHandler
-import tkinter as tk
-import tkinter.messagebox as messagebox
 
 # Adiciona o diretório atual ao sys.path para importações limpas
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +11,8 @@ if __name__ == "__main__":
         app = AppWindow()
         app.mainloop()
     except Exception as e:
-        # If the app fails to start (e.g., missing dependencies or config issues), show a message.
+        # Se o aplicativo não conseguir iniciar (ex: dependências ausentes ou problemas de configuração), mostra uma mensagem.
+        import traceback, tkinter as tk, tkinter.messagebox as messagebox
         tb = traceback.format_exc()
         print(tb)
         root = tk.Tk()

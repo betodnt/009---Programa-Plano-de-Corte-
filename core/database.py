@@ -1,7 +1,6 @@
 import os
 import time
 import shutil
-import logging
 from contextlib import contextmanager
 import xml.etree.ElementTree as ET
 
@@ -64,8 +63,8 @@ class DatabaseManager:
             name, ext = os.path.splitext(base)
             backup_path = os.path.join(dirpath, f"{name}_backup{ext}")
             shutil.copy2(file_path, backup_path)
-        except Exception as e:
-            logging.warning(f"Falha ao criar backup automático do XML: {e}")
+        except Exception:
+            pass
 
     @staticmethod
     def initialize_xml_if_needed(file_path):
@@ -98,9 +97,8 @@ class DatabaseManager:
                 tree.write(file_path, encoding="utf-8", xml_declaration=True)
                 DatabaseManager._auto_backup(file_path)
                 return True, ""
-            except Exception as e:
+            except Exception:
                 try:
-                    logging.error(f"Erro ao salvar entrada (tentando recriar XML): {e}", exc_info=True)
                     root = ET.Element("Dados")
                     entrada = ET.SubElement(root, "Entrada")
                     ET.SubElement(entrada, "Pedido").text = str(pedido)
@@ -115,7 +113,6 @@ class DatabaseManager:
                     DatabaseManager._auto_backup(file_path)
                     return True, ""
                 except Exception as inner_e:
-                    logging.critical(f"Erro fatal ao recriar XML: {inner_e}", exc_info=True)
                     return False, f"Erro fatal ao salvar XML: {inner_e}"
 
     @staticmethod
@@ -148,5 +145,4 @@ class DatabaseManager:
                 DatabaseManager._auto_backup(file_path)
                 return True, ""
             except Exception as e:
-                logging.error(f"Erro ao salvar término no XML: {e}", exc_info=True)
                 return False, f"Erro XML ao finalizar: {e}"

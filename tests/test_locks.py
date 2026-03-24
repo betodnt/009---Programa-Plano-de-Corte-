@@ -36,13 +36,13 @@ def test_release_all_locks_for_pid(temp_locks_file):
     LocksManager.release_all_locks_for_pid()
     with open(temp_locks_file, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # Since they are our locks, they should be removed
+    # Como são nossos locks, eles devem ser removidos
     assert len(data) == 0
 
 def test_is_locked(temp_locks_file):
     assert not LocksManager.is_locked("Maquina1", "Saida1")
     LocksManager.acquire_lock("Maquina1", "Saida1")
-    # Since it's our own lock, is_locked returns False
+    # Como é o nosso próprio lock, is_locked retorna False
     assert not LocksManager.is_locked("Maquina1", "Saida1")
 
 def test_get_locked_saidas(temp_locks_file):
@@ -50,15 +50,15 @@ def test_get_locked_saidas(temp_locks_file):
     LocksManager.acquire_lock("Maquina1", "Saida2")
     LocksManager.acquire_lock("Maquina2", "Saida3")
     locked = LocksManager.get_locked_saidas("Maquina1")
-    # Since these are our own locks, they are not considered locked for others
+    # Como são nossos próprios locks, não são considerados bloqueados para outros
     assert locked == []
 
 def test_clean_expired_locks(temp_locks_file, monkeypatch):
-    # Mock time to simulate expiration
+    # Simula o tempo para testar a expiração
     monkeypatch.setattr("core.locks.LOCK_TIMEOUT", 1)  # 1 second timeout
     LocksManager.acquire_lock("Maquina1", "Saida1")
     time.sleep(2)  # Wait for expiration
-    # Next operation should clean expired
+    # A próxima operação deve limpar os locks expirados
     LocksManager.acquire_lock("Maquina2", "Saida2")
     with open(temp_locks_file, "r", encoding="utf-8") as f:
         data = json.load(f)
