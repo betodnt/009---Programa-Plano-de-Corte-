@@ -1,9 +1,39 @@
 import json
 import os
 import time
+from contextlib import contextmanager
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCK_TIMEOUT = 3600
+
+@contextmanager
+def _json_file_lock(file_path):
+    """Bloqueio simples para evitar corrupção do JSON por concorrência"""
+    lock_path = file_path + ".writelock"
+    start_time = time.time()
+    acquired = False
+    try:
+        while time.time() - start_time < 5:  # Timeout de 5s para adquirir lock
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                acquired = True
+                break
+            except FileExistsError:
+                # Se o lock for muito velho (>10s), assume que travou e remove
+                try:
+                    if time.time() - os.stat(lock_path).st_mtime > 10:
+                        os.remove(lock_path)
+                except OSError:
+                    pass
+                time.sleep(0.1)
+        yield acquired
+    finally:
+        if acquired:
+            try:
+                os.remove(lock_path)
+            except OSError:
+                pass
 
 def _get_locks_file():
     try:
@@ -28,8 +58,13 @@ class LocksManager:
     @staticmethod
     def _save_locks(locks):
         locks_file = _get_locks_file()
-        with open(locks_file, 'w', encoding='utf-8') as f:
-            json.dump(locks, f, ensure_ascii=False, indent=2)
+        # Usa o lock para garantir que ninguém mais está escrevendo
+        with _json_file_lock(locks_file) as acquired:
+            if not acquired:
+                # Se não conseguiu lock, loga ou ignora, mas evita corrupção
+                return
+            with open(locks_file, 'w', encoding='utf-8') as f:
+                json.dump(locks, f, ensure_ascii=False, indent=2)
 
     @staticmethod
     def _clean_expired_locks(locks):
@@ -42,6 +77,10 @@ class LocksManager:
 
     @staticmethod
     def acquire_lock(maquina, saida, operador="", pedido=""):
+        # Carrega dentro do lock de escrita ou carrega e salva rápido
+        # Aqui carregamos, modificamos e salvamos.
+        # Idealmente o load também deveria respeitar o lock se for crítico, 
+        # mas para performance, protegemos principalmente a escrita/leitura atômica no save.
         locks = LocksManager._load_locks()
         locks = LocksManager._clean_expired_locks(locks)
         lock_key = f"{maquina}|{saida}"

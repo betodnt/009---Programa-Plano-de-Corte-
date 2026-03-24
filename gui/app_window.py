@@ -92,12 +92,21 @@ class AppWindow(tk.Tk):
         self.after(1000, self._update_saidas_if_needed)
 
     def _update_saidas_if_needed(self):
+        # Move a verificação de locks (I/O de arquivo) para uma thread
+        if self.form_panel._all_saidas and self.form_panel.cbox_saida.cget('state') == 'readonly':
+            threading.Thread(target=self._background_check_locks, daemon=True).start()
+        
+        self.after(5000, self._update_saidas_if_needed)
+
+    def _background_check_locks(self):
         try:
-            if self.form_panel._all_saidas and self.form_panel.cbox_saida.cget('state') == 'readonly':
-                self.form_panel.update_saidas(self.form_panel._all_saidas)
+            # Apenas busca os locks, não atualiza UI aqui
+            maquina = self.form_panel.var_maquina.get()
+            locked_saidas = LocksManager.get_locked_saidas(maquina)
+            # Agenda atualização da UI
+            self.after_idle(lambda: self.form_panel.apply_locked_saidas_filter(locked_saidas))
         except Exception:
             pass
-        self.after(5000, self._update_saidas_if_needed)
 
     def on_closing(self):
         if self.active_runner and self.active_runner.thread.is_alive():

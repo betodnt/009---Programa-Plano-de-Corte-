@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tkinter as tk
 from tkinter import ttk
 import tkinter.font as tkfont
-import threading
 from typing import cast, Any
 import time
 import json
@@ -323,11 +322,7 @@ class MonitorApp(tk.Tk):
         self.after(REFRESH_INTERVAL_MS, self._schedule_refresh)
 
     def _refresh(self):
-        # Executa I/O em thread separada
-        threading.Thread(target=self._load_data_thread, daemon=True).start()
-
-    def _load_data_thread(self):
-        # 1. Carrega Locks Ativos
+        # 1. Carrega Locks Ativos (apenas se estiver vendo o dia de hoje)
         active_items = []
         today_str = datetime.now().strftime("%d/%m/%Y")
         
@@ -361,9 +356,31 @@ class MonitorApp(tk.Tk):
                              tags=("active",))
             active_items.append(key)
 
-        # Exibe Histórico
-        for row in history_rows:
-             self.tree.insert("", "end", values=row, tags=("history",))
+        # Limitar histórico para reduzir carga de memória (últimas 50 entradas)
+        xml_path = _get_xml_path_for_date(self.view_date)
+        history_count = 0
+        if os.path.exists(xml_path):
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+                max_history = 50
+                for entrada in root.findall("Entrada"):
+                    if history_count >= max_history:
+                        break
+                    if entrada.find("DataHoraTermino") is not None:
+                        operador = entrada.findtext("Operador", "—")
+                        maquina = entrada.findtext("Maquina", "—")
+                        pedido = entrada.findtext("Pedido", "—")
+                        plano = entrada.findtext("Saida", "—")
+                        duracao = entrada.findtext("TempoDecorrido", "—")
+                        dt_term = entrada.findtext("DataHoraTermino", "")
+                        hora_conclusao = dt_term.split(' ')[1] if ' ' in dt_term else dt_term
+                        self.tree.insert("", "end",
+                                            values=(operador, maquina, pedido, plano, duracao, hora_conclusao),
+                                            tags=("history",))
+                        history_count += 1
+            except Exception:
+                pass
 
         count = len(active_items)
         self.lbl_count.config(

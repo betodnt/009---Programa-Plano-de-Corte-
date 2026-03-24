@@ -85,15 +85,22 @@ class FormPanel(ttk.Frame):
     def update_saidas(self, results):
         """Atualiza lista de saídas, filtrando as que estão bloqueadas"""
         self._all_saidas = list(results)
-        
         maquina = self.var_maquina.get()
         locked_saidas = LocksManager.get_locked_saidas(maquina)
-        
+        self.apply_locked_saidas_filter(locked_saidas)
+
+    def apply_locked_saidas_filter(self, locked_saidas):
+        """Aplica o filtro visualmente (chamado pela thread de UI)"""
+        current_val = self.var_saida.get()
         available_saidas = [s for s in self._all_saidas if s not in locked_saidas]
         
         self.cbox_saida['values'] = available_saidas
         if available_saidas:
-            self.cbox_saida.current(0)
+            # Tenta manter o valor selecionado se ele ainda for válido
+            if current_val in available_saidas:
+                self.var_saida.set(current_val)
+            else:
+                self.cbox_saida.current(0)
             # Habilita o botão iniciar
             if hasattr(self.master, 'action_panel'):
                 self.master.action_panel.btn_iniciar.state(['!disabled'])
