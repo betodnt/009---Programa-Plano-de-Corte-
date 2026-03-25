@@ -4,7 +4,7 @@ import time
 from contextlib import contextmanager
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOCK_TIMEOUT = 3600
+LOCK_TIMEOUT = 14400 # 4 horas (estendido para permitir alerta visual no Monitor antes de expirar)
 
 @contextmanager
 def _json_file_lock(file_path):
@@ -15,6 +15,7 @@ def _json_file_lock(file_path):
     try:
         while time.time() - start_time < 5:  # Timeout de 5s para adquirir lock
             try:
+                # Tenta criar arquivo de lock de forma atômica
                 fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
                 os.close(fd)
                 acquired = True
@@ -67,8 +68,32 @@ class LocksManager:
                 json.dump(locks, f, ensure_ascii=False, indent=2)
 
     @staticmethod
+    def _modify_locks_safely(callback):
+        locks_file = _get_locks_file()
+        with _json_file_lock(locks_file) as acquired:
+            if not acquired:
+                return False
+            locks = {}
+            if os.path.exists(locks_file):
+                try:
+                    with open(locks_file, 'r', encoding='utf-8') as f:
+                        locks = json.load(f)
+                except Exception:
+                    pass
+            locks = LocksManager._clean_expired_locks(locks)
+            locks = callback(locks)
+            if locks is not None:
+                try:
+                    with open(locks_file, 'w', encoding='utf-8') as f:
+                        json.dump(locks, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+            return True
+
+    @staticmethod
     def _clean_expired_locks(locks):
         current_time = time.time()
+        # Remove locks antigos (> 1 hora)
         expired = [k for k, v in locks.items()
                    if current_time - v.get('timestamp', 0) > LOCK_TIMEOUT]
         for k in expired:
@@ -77,40 +102,37 @@ class LocksManager:
 
     @staticmethod
     def acquire_lock(maquina, saida, operador="", pedido=""):
-        # Carrega dentro do lock de escrita ou carrega e salva rápido
-        # Aqui carregamos, modificamos e salvamos.
-        # Idealmente o load também deveria respeitar o lock se for crítico, 
-        # mas para performance, protegemos principalmente a escrita/leitura atômica no save.
-        locks = LocksManager._load_locks()
-        locks = LocksManager._clean_expired_locks(locks)
-        lock_key = f"{maquina}|{saida}"
-        locks[lock_key] = {
-            'maquina': maquina,
-            'saida': saida,
-            'operador': operador,
-            'pedido': pedido,
-            'pid': os.getpid(),
-            'timestamp': time.time()
-        }
-        LocksManager._save_locks(locks)
+        def _add_lock(locks):
+            lock_key = f"{maquina}|{saida}"
+            locks[lock_key] = {
+                'maquina': maquina,
+                'saida': saida,
+                'operador': operador,
+                'pedido': pedido,
+                'pid': os.getpid(),
+                'timestamp': time.time()
+            }
+            return locks
+        LocksManager._modify_locks_safely(_add_lock)
 
     @staticmethod
     def release_lock(maquina, saida):
-        locks = LocksManager._load_locks()
-        lock_key = f"{maquina}|{saida}"
-        if lock_key in locks:
-            del locks[lock_key]
-            LocksManager._save_locks(locks)
+        def _del_lock(locks):
+            lock_key = f"{maquina}|{saida}"
+            if lock_key in locks:
+                del locks[lock_key]
+            return locks
+        LocksManager._modify_locks_safely(_del_lock)
 
     @staticmethod
     def release_all_locks_for_pid():
-        locks = LocksManager._load_locks()
-        current_pid = os.getpid()
-        to_remove = [k for k, v in locks.items() if v.get('pid') == current_pid]
-        for k in to_remove:
-            del locks[k]
-        if to_remove:
-            LocksManager._save_locks(locks)
+        def _del_pid_locks(locks):
+            current_pid = os.getpid()
+            to_remove = [k for k, v in locks.items() if v.get('pid') == current_pid]
+            for k in to_remove:
+                del locks[k]
+            return locks
+        LocksManager._modify_locks_safely(_del_pid_locks)
 
     @staticmethod
     def is_locked(maquina, saida):

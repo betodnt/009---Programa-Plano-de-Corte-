@@ -11,38 +11,10 @@ import time
 import json
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from core.config import ConfigManager
 
-def _get_locks_file():
-    try:
-        from core.config import ConfigManager
-        return ConfigManager.get_locks_file_path()
-    except Exception:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "active_locks.json")
-
-def _get_xml_path_for_date(date_str):
-    # Converte o formato de exibição (DD/MM/YYYY) para o formato de arquivo (YYYY-MM-DD)
-    file_date_str = date_str
-    try:
-        dt = datetime.strptime(date_str, "%d/%m/%Y")
-        file_date_str = dt.strftime("%Y-%m-%d")
-    except ValueError:
-        pass
-
-    try:
-        from core.config import ConfigManager
-        # Tenta obter o caminho configurado. O ConfigManager._get_path é protegido, então acessamos via método público se possível ou recriamos a lógica parcial
-        # Como get_k8_data_path usa datetime.now(), precisamos acessar a config bruta ou simular
-        config_val = ConfigManager._get_path('DadosXml', '')
-        if config_val and '{date}' in config_val:
-            return config_val.replace('{date}', file_date_str)
-        if not config_val or config_val.endswith('dados.xml'):
-            # Caminho padrão ajustado para a data solicitada
-            return ConfigManager._resolve_path(f'./public/dados/dados_{file_date_str}.xml')
-        return config_val
-    except Exception:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "public", "dados", f"dados_{file_date_str}.xml")
-
-LOCK_TIMEOUT = 3600
+LOCK_TIMEOUT = 14400  # Aumentado para 4h (permite ver atrasos > 1h antes de expirar)
+WARNING_THRESHOLD = 3600  # Destacar em vermelho após 1h (3600 segundos)
 REFRESH_INTERVAL_MS = 5000  # Aumentado de 2000 para 5000ms para reduzir carga
 
 BG_DARK   = "#2b2b2b"
@@ -55,26 +27,14 @@ GREEN     = "#27ae60"
 RED       = "#c0392b"
 ORANGE    = "#f39c12"
 
-
-def _pid_alive(pid):
-    # Otimizado: verificar PID de forma mais leve
-    try:
-        import subprocess
-        # Usar tasklist mais eficiente que ctypes para verificar processo
-        result = subprocess.run(['tasklist', '/FI', f'PID eq {pid}', '/NH'],
-                              capture_output=True, text=True, timeout=1)
-        return str(pid) in result.stdout
-    except Exception:
-        return True  # Assume vivo se não conseguir verificar
-
-
 def load_active_locks():
-    locks_file = _get_locks_file()
+    locks_file = ConfigManager.get_locks_file_path()
     if not os.path.exists(locks_file):
         return {}
     try:
         with open(locks_file, "r", encoding="utf-8") as f:
             data = json.load(f)
+            
         now = time.time()
         valid = {}
         stale = []
@@ -82,18 +42,13 @@ def load_active_locks():
             if now - v.get("timestamp", 0) > LOCK_TIMEOUT:
                 stale.append(k)
                 continue
-            # Desabilitado para reduzir carga em sistemas antigos
-            # pid = v.get("pid")
-            # if pid and not _pid_alive(int(pid)):
-            #     stale.append(k)
-            #     continue
+            # NOTA: Não verificamos PID aqui pois estamos em rede.
+            # O PID 1234 da Maquina 1 não existe no PC do Monitor, ou é outro processo.
             valid[k] = v
+            
         if stale:
-            try:
-                with open(locks_file, "w", encoding="utf-8") as f:
-                    json.dump(valid, f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            # O Monitor apenas lê, deixa a limpeza para as máquinas ativas para evitar conflito de escrita
+            pass
         return valid
     except Exception:
         return {}
@@ -115,7 +70,9 @@ class MonitorApp(tk.Tk):
         today = datetime.now().strftime("%d/%m/%Y")
         self.entry_date_var = tk.StringVar(value=today)
         self.view_date = today
-        self._last_locks = None
+        self._last_xml_mtime = 0
+        self._cached_history_items = []
+        self._is_loading = False  # Flag para evitar thread explosion
         self._setup_styles()
         self._build_ui()
         self._load_icon()
@@ -298,6 +255,7 @@ class MonitorApp(tk.Tk):
         self.tree.tag_configure("active", foreground=GREEN)
         self.tree.tag_configure("idle",   foreground=FG_DIM)
         self.tree.tag_configure("history", foreground=FG_WHITE)
+        self.tree.tag_configure("delayed", foreground=RED)
 
         self.tree.grid(row=0, column=0, sticky="nsew")
         self.after(100, self._adjust_tree_columns)
@@ -309,13 +267,14 @@ class MonitorApp(tk.Tk):
 
         footer = ttk.Frame(self, style="Card.TFrame", padding=(14, 6))
         footer.pack(fill="x", padx=12, pady=(0, 8))
-        ttk.Label(footer, text=f"Atualiza a cada 2 segundos  |  Arquivo: {_get_locks_file()}",
+        ttk.Label(footer, text=f"Atualiza a cada 5 segundos  |  Arquivo: {ConfigManager.get_locks_file_path()}",
                   style="Dim.TLabel").pack(side="left")
 
     def _on_search_click(self):
         # Atualiza a data de visualização e força o refresh
         self.view_date = self.entry_date_var.get().strip()
-        self._last_locks = None # Força redesenho
+        self._last_xml_mtime = 0 # Força recarga do histórico
+        self._cached_history_items = []
         self._refresh()
 
     def _schedule_refresh(self):
@@ -323,57 +282,109 @@ class MonitorApp(tk.Tk):
         self.after(REFRESH_INTERVAL_MS, self._schedule_refresh)
 
     def _refresh(self):
+        # Se já estiver carregando (ex: rede lenta), não inicia outra thread
+        if self._is_loading:
+            return
+            
         # Executa I/O em thread separada
+        self._is_loading = True
         threading.Thread(target=self._load_data_thread, daemon=True).start()
 
     def _load_data_thread(self):
-        # 1. Carrega Locks Ativos
-        active_items = []
-        today_str = datetime.now().strftime("%d/%m/%Y")
-        
-        # Se a data visualizada for hoje, carregamos os locks ativos
-        if self.view_date == today_str:
-            locks = load_active_locks()
-        else:
-            locks = {}
+        try:
+            # 1. Carrega Locks Ativos
+            active_items = []
+            today_str = datetime.now().strftime("%d/%m/%Y")
+            
+            # Se a data visualizada for hoje, carregamos os locks ativos
+            if self.view_date == today_str:
+                locks = load_active_locks()
+            else:
+                locks = {}
 
-        # Se nada mudou nos locks e estamos no modo "hoje", apenas atualizamos durações dos ativos
-        # Mas como temos histórico misturado, precisamos verificar se vale a pena redesenhar tudo
-        # Para simplificar, se houver locks, atualizamos as durações visualmente, mas se o xml mudou, teríamos que recarregar.
-        # Vamos redesenhar sempre que houver mudança ou a cada ciclo para garantir que o XML novo apareça
-        
-        # Para evitar flicker excessivo, podemos checar mtime do XML, mas vamos simplificar redesenhando lista
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+            # Coleta dados para atualizar na Main Thread (TKinter não é thread-safe)
+            # Mas treeview.delete/insert muitas vezes funciona, porém o correto é usar after ou filas
+            # Aqui manteremos a lógica atual mas protegida pelo try/finally
+            
+            # Limpa a árvore para redesenhar
+            for item in self.tree.get_children():
+                self.tree.delete(item)
 
-        now = time.time()
-        
-        # Exibe Itens Ativos (Locks)
-        for key, data in sorted(locks.items(), key=lambda x: x[1].get("timestamp", 0)):
-            operador = data.get("operador") or "—"
-            maquina  = data.get("maquina")  or "—"
-            pedido   = data.get("pedido")   or "—"
-            plano    = data.get("saida")    or "—"
-            elapsed  = int(now - data.get("timestamp", now))
-            duracao  = self._fmt_duration(elapsed)
-            self.tree.insert("", "end", iid=key,
-                             values=(operador, maquina, pedido, plano, duracao, ""),
-                             tags=("active",))
-            active_items.append(key)
+            now = time.time()
+            
+            # Exibe Itens Ativos (Locks)
+            for key, data in sorted(locks.items(), key=lambda x: x[1].get("timestamp", 0)):
+                operador = data.get("operador") or "—"
+                maquina  = data.get("maquina")  or "—"
+                pedido   = data.get("pedido")   or "—"
+                plano    = data.get("saida")    or "—"
+                elapsed  = int(now - data.get("timestamp", now))
+                duracao  = self._fmt_duration(elapsed)
+                
+                # Verifica se ultrapassou o limite de alerta
+                tags = ("active",)
+                if elapsed > WARNING_THRESHOLD:
+                    tags = ("delayed",)
+                    
+                self.tree.insert("", "end", iid=key,
+                                values=(operador, maquina, pedido, plano, duracao, ""),
+                                tags=tags)
+                active_items.append(key)
 
-        # Exibe Histórico
-        for row in history_rows:
-             self.tree.insert("", "end", values=row, tags=("history",))
+            # 2. Carrega Histórico (XML) usando ConfigManager
+            xml_path = ConfigManager.get_k8_data_path(self.view_date)
+            history_items = []
+            
+            if os.path.exists(xml_path):
+                try:
+                    current_mtime = os.stat(xml_path).st_mtime
+                    # Só reprocessa o XML se o arquivo mudou ou se mudamos a data de visualização
+                    if current_mtime != self._last_xml_mtime or not self._cached_history_items:
+                        tree = ET.parse(xml_path)
+                        root = tree.getroot()
+                        temp_items = []
+                        # Coleta todos para inverter a ordem (mais recentes no topo do histórico)
+                        for entrada in root.findall("Entrada"):
+                            if entrada.find("DataHoraTermino") is not None:
+                                operador = entrada.findtext("Operador", "—")
+                                maquina = entrada.findtext("Maquina", "—")
+                                pedido = entrada.findtext("Pedido", "—")
+                                plano = entrada.findtext("Saida", "—")
+                                duracao = entrada.findtext("TempoDecorrido", "—")
+                                dt_term = entrada.findtext("DataHoraTermino", "")
+                                hora_conclusao = dt_term.split(' ')[1] if ' ' in dt_term else dt_term
+                                temp_items.append((operador, maquina, pedido, plano, duracao, hora_conclusao))
+                        
+                        # Inverte para mostrar os últimos finalizados primeiro
+                        self._cached_history_items = temp_items[::-1]
+                        self._last_xml_mtime = current_mtime
+                    
+                    history_items = self._cached_history_items
+                except Exception:
+                    pass
+            else:
+                self._cached_history_items = []
+                self._last_xml_mtime = 0
 
-        count = len(active_items)
-        self.lbl_count.config(
-            text=f"{count} ativos | {history_count} finalizados",
-            foreground=GREEN if count > 0 else FG_DIM
-        )
-        self.lbl_status.config(text=time.strftime("atualizado %H:%M:%S"))
+            # Renderiza Histórico (limite de 100 para não travar a UI)
+            count_history = 0
+            for item in history_items:
+                if count_history >= 100: break
+                self.tree.insert("", "end", values=item, tags=("history",))
+                count_history += 1
 
-        # Garantir ajuste final após atualização de dados
-        self.after(1, self._adjust_tree_columns)
+            count = len(active_items)
+            self.lbl_count.config(
+                text=f"{count} ativos | {len(history_items)} finalizados",
+                foreground=GREEN if count > 0 else FG_DIM
+            )
+            self.lbl_status.config(text=time.strftime("atualizado %H:%M:%S"))
+
+            # Garantir ajuste final após atualização de dados
+            self.after(1, self._adjust_tree_columns)
+            
+        finally:
+            self._is_loading = False
 
     def _update_durations(self, locks):
         now = time.time()

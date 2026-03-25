@@ -30,6 +30,7 @@ class SimpleLockFile:
                 pass
             if time.time() - start_time > timeout_sec:
                 return False
+            # Sleep um pouco maior para reduzir contenção de rede
             time.sleep(0.2)
 
     def unlock(self):
@@ -97,23 +98,26 @@ class DatabaseManager:
                 tree.write(file_path, encoding="utf-8", xml_declaration=True)
                 DatabaseManager._auto_backup(file_path)
                 return True, ""
-            except Exception:
-                try:
-                    root = ET.Element("Dados")
-                    entrada = ET.SubElement(root, "Entrada")
-                    ET.SubElement(entrada, "Pedido").text = str(pedido)
-                    ET.SubElement(entrada, "Operador").text = str(operador)
-                    ET.SubElement(entrada, "Maquina").text = str(maquina)
-                    ET.SubElement(entrada, "Chapa").text = str(retalho)
-                    ET.SubElement(entrada, "Saida").text = str(saida)
-                    ET.SubElement(entrada, "Tipo").text = str(tipo)
-                    ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
-                    ET.SubElement(entrada, "Instancia").text = str(os.getpid())
-                    ET.ElementTree(root).write(file_path, encoding="utf-8", xml_declaration=True)
-                    DatabaseManager._auto_backup(file_path)
-                    return True, ""
-                except Exception as inner_e:
-                    return False, f"Erro fatal ao salvar XML: {inner_e}"
+            except Exception as e:
+                # CRÍTICO: Não criar novo XML se falhar o parse e o arquivo já existir
+                if not os.path.exists(file_path):
+                    try:
+                        root = ET.Element("Dados")
+                        entrada = ET.SubElement(root, "Entrada")
+                        ET.SubElement(entrada, "Pedido").text = str(pedido)
+                        ET.SubElement(entrada, "Operador").text = str(operador)
+                        ET.SubElement(entrada, "Maquina").text = str(maquina)
+                        ET.SubElement(entrada, "Chapa").text = str(retalho)
+                        ET.SubElement(entrada, "Saida").text = str(saida)
+                        ET.SubElement(entrada, "Tipo").text = str(tipo)
+                        ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
+                        ET.SubElement(entrada, "Instancia").text = str(os.getpid())
+                        ET.ElementTree(root).write(file_path, encoding="utf-8", xml_declaration=True)
+                        DatabaseManager._auto_backup(file_path)
+                        return True, ""
+                    except Exception as inner_e:
+                         return False, f"Erro ao criar novo XML: {inner_e}"
+                return False, f"Erro ao ler XML (arquivo corrompido ou bloqueado): {e}"
 
     @staticmethod
     def save_termino(file_path, pedido, operador, maquina, dt_termino, tempo_decorrido):

@@ -35,6 +35,10 @@ class ConfigManager:
             'current_machine': 'Bodor1 (12K)',
             'available_machines': 'Bodor1 (12K), Bodor2 (6K), Bodor3 (4K), Trumpf1, Trumpf2'
         }
+        config['Auth'] = {
+            'admin_user': 'PCP01',
+            'admin_pass': 'pcp0126'
+        }
         with open(CONFIG_FILE, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
 
@@ -81,9 +85,22 @@ class ConfigManager:
         return ConfigManager._get_path('SaidasCortadas', './public/saidas_cortadas')
 
     @staticmethod
-    def get_k8_data_path():
+    def get_k8_data_path(target_date=None):
+        """Retorna o caminho do XML de dados. Aceita datetime ou string YYYY-MM-DD opcional."""
         from datetime import datetime
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        if target_date is None:
+            target_date = datetime.now()
+        
+        # Se for objeto datetime, converte. Se for string, assume que já é ou ajusta.
+        if hasattr(target_date, 'strftime'):
+            date_str = target_date.strftime("%Y-%m-%d")
+        else:
+            # Se vier string formato brasileiro, tenta converter, senão usa como está
+            try:
+                dt_obj = datetime.strptime(str(target_date), "%d/%m/%Y")
+                date_str = dt_obj.strftime("%Y-%m-%d")
+            except ValueError:
+                date_str = str(target_date)
         
         # Forçamos arquivos diários, então verificamos se a configuração tem um template ou usamos o padrão diário
         config_val = ConfigManager._get_path('DadosXml', '')
@@ -107,6 +124,10 @@ class ConfigManager:
     @staticmethod
     def get_current_machine():
         """Retorna a máquina atualmente selecionada"""
+        # 0. Permite sobrescrever via variável de ambiente (útil para testes de múltiplas instâncias)
+        if os.getenv("PCP_MACHINE_ID"):
+            return os.getenv("PCP_MACHINE_ID")
+            
         ConfigManager._ensure_loaded()
         config = ConfigManager._config_cache
         if config and config.has_section('Machine') and config.has_option('Machine', 'current_machine'):
@@ -136,6 +157,25 @@ class ConfigManager:
             if machines_str:
                 return [m.strip() for m in machines_str.split(',')]
         return default_machines
+
+    @staticmethod
+    def get_admin_credentials():
+        """Retorna (usuario, senha) priorizando: Env Var > Config.ini > Default"""
+        # 1. Tenta Variáveis de Ambiente (Mais seguro)
+        env_user = os.getenv("PCP_ADMIN_USER")
+        env_pass = os.getenv("PCP_ADMIN_PASS")
+        if env_user and env_pass:
+            return env_user, env_pass
+
+        # 2. Tenta Config.ini
+        ConfigManager._ensure_loaded()
+        config = ConfigManager._config_cache
+        if config and config.has_section('Auth'):
+            return config.get('Auth', 'admin_user', fallback='PCP01'), \
+                   config.get('Auth', 'admin_pass', fallback='pcp0126')
+        
+        # 3. Fallback Hardcoded (para compatibilidade imediata)
+        return "PCP01", "pcp0126"
 
     @staticmethod
     def get_all_settings():

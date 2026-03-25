@@ -19,7 +19,7 @@ def build_exe():
     # Opções do PyInstaller
     options = [
         "--onedir",  # Pasta com executável (mais rápido que --onefile)
-        "--console",  # Com console para ver erros (mude para --windowed quando funcionar)
+        "--windowed",  # Esconde o prompt de comando (console)
         "--clean",  # Limpa cache para build mais limpo
         "--strip",  # Remove símbolos de debug para reduzir tamanho
         "--name=ProgramaPlanoCorte",  # Nome do executável

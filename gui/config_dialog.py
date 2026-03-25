@@ -5,9 +5,9 @@ from core.config import ConfigManager
 class ConfigDialog(tk.Toplevel):
     def __init__(self, master):
         super().__init__(master)
-        self.title("Configurações de Diretórios")
-        self.geometry("700x800")
-        self.resizable(False, True)
+        self.title("Login - Acesso Restrito")
+        self.geometry("350x200")
+        self.resizable(False, False)
         
         # Torna a janela modal
         self.transient(master)
@@ -20,13 +20,99 @@ class ConfigDialog(tk.Toplevel):
         
         self.entries = {}
         
-        self._build_ui()
+        self._build_login_ui()
         
         # Centralizar a janela
+        self._center_window(master)
+
+    def _center_window(self, master):
         self.update_idletasks()
-        x = master.winfo_x() + (master.winfo_width() // 2) - (self.winfo_width() // 2)
-        y = master.winfo_y() + (master.winfo_height() // 2) - (self.winfo_height() // 2)
-        self.geometry(f"+{x}+{y}")
+        try:
+            x = master.winfo_x() + (master.winfo_width() // 2) - (self.winfo_width() // 2)
+            y = master.winfo_y() + (master.winfo_height() // 2) - (self.winfo_height() // 2)
+            self.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
+
+    def _build_login_ui(self):
+        self.login_frame = ttk.Frame(self, padding="20")
+        self.login_frame.pack(fill="both", expand=True)
+        
+        style = ttk.Style()
+        style.configure("Login.TLabel", background="#2b2b2b", foreground="#ffffff", font=("Segoe UI", 10))
+        
+        # Título
+        lbl = ttk.Label(self.login_frame, text="Autenticação Necessária", font=("Segoe UI", 12, "bold"), background="#2b2b2b", foreground="#ffffff")
+        lbl.pack(pady=(0, 20))
+
+        # Campos
+        frm_fields = ttk.Frame(self.login_frame)
+        frm_fields.pack(fill="x", pady=5)
+        
+        ttk.Label(frm_fields, text="Usuário:", style="Login.TLabel", width=10).grid(row=0, column=0, sticky="w", pady=5)
+        self.ent_user = ttk.Entry(frm_fields)
+        self.ent_user.grid(row=0, column=1, sticky="ew", pady=5)
+        
+        ttk.Label(frm_fields, text="Senha:", style="Login.TLabel", width=10).grid(row=1, column=0, sticky="w", pady=5)
+        
+        # Frame container para senha e botão de olho
+        frm_pass = ttk.Frame(frm_fields)
+        frm_pass.grid(row=1, column=1, sticky="ew", pady=5)
+        frm_pass.columnconfigure(0, weight=1)
+        
+        self.ent_pass = ttk.Entry(frm_pass, show="*")
+        self.ent_pass.grid(row=0, column=0, sticky="ew")
+        
+        # Botão para alternar visibilidade (usando tk.Button para estilização mais fácil do background)
+        self.btn_eye = tk.Button(frm_pass, text="👁", width=3, cursor="hand2",
+                                 command=self._toggle_password_visibility,
+                                 relief="flat", bg="#3c3f41", fg="white",
+                                 activebackground="#505355", activeforeground="white",
+                                 font=("Segoe UI", 10))
+        self.btn_eye.grid(row=0, column=1, padx=(5, 0))
+        
+        frm_fields.columnconfigure(1, weight=1)
+        
+        self.ent_pass.bind('<Return>', lambda e: self._attempt_login())
+        self.ent_user.focus()
+
+        # Botões
+        btn_frame = ttk.Frame(self.login_frame)
+        btn_frame.pack(fill="x", pady=(20, 0))
+        
+        btn_login = ttk.Button(btn_frame, text="Entrar", command=self._attempt_login)
+        btn_login.pack(side="right", padx=5)
+        btn_cancel = ttk.Button(btn_frame, text="Cancelar", command=self.destroy)
+        btn_cancel.pack(side="right")
+
+    def _toggle_password_visibility(self):
+        if self.ent_pass.cget('show') == '*':
+            self.ent_pass.config(show='')
+            self.btn_eye.config(text="🔒") # Ícone indicando que está visível (clique para bloquear/esconder)
+        else:
+            self.ent_pass.config(show='*')
+            self.btn_eye.config(text="👁")
+
+    def _attempt_login(self):
+        u = self.ent_user.get().strip()
+        p = self.ent_pass.get().strip()
+        
+        valid_user, valid_pass = ConfigManager.get_admin_credentials()
+        
+        if u == valid_user and p == valid_pass:
+            self.login_frame.destroy()
+            self._init_config_screen()
+        else:
+            messagebox.showerror("Acesso Negado", "Usuário ou senha incorretos.", parent=self)
+            self.ent_pass.delete(0, 'end')
+            self.ent_pass.focus()
+
+    def _init_config_screen(self):
+        self.title("Configurações de Diretórios")
+        self.geometry("700x800")
+        self.resizable(False, True)
+        self._build_ui()
+        self._center_window(self.master)
 
     def _build_ui(self):
         # Botões do rodapé sempre presos no fundo
