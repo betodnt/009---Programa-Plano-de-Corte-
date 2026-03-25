@@ -358,13 +358,18 @@ class AppWindow(tk.Tk):
         dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
 
         OperatorsManager.add_operator(dados["operador"])
-        LocksManager.acquire_lock(dados["maquina"], saida, dados["operador"], dados["pedido"])
+        if not LocksManager.acquire_lock(dados["maquina"], saida, dados["operador"], dados["pedido"]):
+            messagebox.showerror("Erro de Rede", "Não foi possível acessar o arquivo de controle na rede. Verifique se outra máquina está salvando dados.")
+            return False
 
         self.form_panel.disable_fields()
         self._refresh_recent_operators()
 
         src_path = os.path.join(ConfigManager.get_server_path(), saida)
         dst_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
+        
+        # Garante que a pasta local de destino exista
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
 
         self.progress_win = ProgressDialog(self, title="Copiando arquivo CNC...", max_val=0)
         self.active_runner = FileOperationRunner("COPY", src_path, dst_path,
@@ -387,6 +392,9 @@ class AppWindow(tk.Tk):
 
         src_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
         dst_path = os.path.join(ConfigManager.get_saidas_cortadas_path(), saida)
+
+        # Garante que a pasta de destino na rede/local exista
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
 
         self.progress_win = ProgressDialog(self, title="Movendo arquivo CNC...", max_val=0)
         self.active_runner = FileOperationRunner("MOVE", src_path, dst_path,

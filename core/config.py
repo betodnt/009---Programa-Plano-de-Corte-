@@ -101,6 +101,10 @@ class ConfigManager:
                 date_str = dt_obj.strftime("%Y-%m-%d")
             except ValueError:
                 date_str = str(target_date)
+
+        env_xml = os.getenv("PCP_DADOS_XML")
+        if env_xml:
+            return ConfigManager._resolve_path(env_xml.replace("{date}", date_str))
         
         # Forçamos arquivos diários, então verificamos se a configuração tem um template ou usamos o padrão diário
         config_val = ConfigManager._get_path('DadosXml', '')
@@ -119,6 +123,9 @@ class ConfigManager:
 
     @staticmethod
     def get_locks_file_path():
+        env_locks = os.getenv("PCP_LOCKS_FILE")
+        if env_locks:
+            return ConfigManager._resolve_path(env_locks)
         return ConfigManager._get_path('LocksFile', './active_locks.json')
 
     @staticmethod

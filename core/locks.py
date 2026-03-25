@@ -1,49 +1,61 @@
 import json
 import os
+import socket
+import tempfile
 import time
-from contextlib import contextmanager
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOCK_TIMEOUT = 14400 # 4 horas (estendido para permitir alerta visual no Monitor antes de expirar)
+LOCK_TIMEOUT = 14400  # 4 horas
 
-@contextmanager
-def _json_file_lock(file_path):
-    """Bloqueio simples para evitar corrupção do JSON por concorrência"""
-    lock_path = file_path + ".writelock"
-    start_time = time.time()
-    acquired = False
-    try:
-        while time.time() - start_time < 5:  # Timeout de 5s para adquirir lock
+
+class SimpleFileLock:
+    """Mecanismo simples de trava para evitar concorrencia em rede."""
+
+    def __init__(self, lock_path):
+        self.lock_path = lock_path
+
+    def acquire(self, timeout=5.0):
+        start = time.time()
+        while time.time() - start < timeout:
             try:
-                # Tenta criar arquivo de lock de forma atômica
-                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
                 os.close(fd)
-                acquired = True
-                break
+                return True
             except FileExistsError:
-                # Se o lock for muito velho (>10s), assume que travou e remove
                 try:
-                    if time.time() - os.stat(lock_path).st_mtime > 10:
-                        os.remove(lock_path)
+                    if os.path.exists(self.lock_path) and time.time() - os.path.getmtime(self.lock_path) > 10:
+                        try:
+                            os.remove(self.lock_path)
+                        except OSError:
+                            pass
                 except OSError:
                     pass
                 time.sleep(0.1)
-        yield acquired
-    finally:
-        if acquired:
-            try:
-                os.remove(lock_path)
             except OSError:
-                pass
+                time.sleep(0.1)
+        return False
+
+    def release(self):
+        try:
+            os.remove(self.lock_path)
+        except OSError:
+            pass
+
 
 def _get_locks_file():
     try:
         from core.config import ConfigManager
+
         return ConfigManager.get_locks_file_path()
     except Exception:
         return os.path.join(_PROJECT_ROOT, "active_locks.json")
 
+
 class LocksManager:
+    @staticmethod
+    def _get_owner_id():
+        return f"{socket.gethostname()}-{os.getpid()}"
 
     @staticmethod
     def _load_locks():
@@ -51,53 +63,74 @@ class LocksManager:
         if not os.path.exists(locks_file):
             return {}
         try:
-            with open(locks_file, 'r', encoding='utf-8') as f:
+            with open(locks_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except (json.JSONDecodeError, IOError, OSError):
             return {}
 
     @staticmethod
     def _save_locks(locks):
         locks_file = _get_locks_file()
-        # Usa o lock para garantir que ninguém mais está escrevendo
-        with _json_file_lock(locks_file) as acquired:
-            if not acquired:
-                # Se não conseguiu lock, loga ou ignora, mas evita corrupção
-                return
-            with open(locks_file, 'w', encoding='utf-8') as f:
-                json.dump(locks, f, ensure_ascii=False, indent=2)
+        os.makedirs(os.path.dirname(locks_file) or ".", exist_ok=True)
+
+        for attempt in range(3):
+            try:
+                temp_fd, temp_path = tempfile.mkstemp(
+                    dir=os.path.dirname(locks_file) or ".",
+                    prefix=".locks_tmp_",
+                    suffix=".json",
+                )
+                try:
+                    with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+                        json.dump(locks, f, ensure_ascii=False, indent=2)
+                    os.replace(temp_path, locks_file)
+                    return True
+                except Exception:
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
+                    raise
+            except Exception:
+                if attempt < 2:
+                    time.sleep(0.1 * (attempt + 1))
+                else:
+                    print(f"[LOCKS] Falha ao salvar locks apos 3 tentativas: {locks_file}")
+                    return False
+        return False
 
     @staticmethod
     def _modify_locks_safely(callback):
         locks_file = _get_locks_file()
-        with _json_file_lock(locks_file) as acquired:
-            if not acquired:
+        lock_manager = SimpleFileLock(locks_file + ".lock")
+
+        if lock_manager.acquire(timeout=7.0):
+            try:
+                locks = LocksManager._load_locks()
+                locks = LocksManager._clean_expired_locks(locks)
+                locks = callback(locks)
+                if locks is not None:
+                    return LocksManager._save_locks(locks)
                 return False
-            locks = {}
-            if os.path.exists(locks_file):
-                try:
-                    with open(locks_file, 'r', encoding='utf-8') as f:
-                        locks = json.load(f)
-                except Exception:
-                    pass
-            locks = LocksManager._clean_expired_locks(locks)
-            locks = callback(locks)
-            if locks is not None:
-                try:
-                    with open(locks_file, 'w', encoding='utf-8') as f:
-                        json.dump(locks, f, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
-            return True
+            except Exception as e:
+                print(f"[LOCKS] Erro critico na modificacao: {e}")
+                return False
+            finally:
+                lock_manager.release()
+        print("[LOCKS] Erro: Timeout aguardando liberacao do arquivo de rede.")
+        return False
+
+    @staticmethod
+    def get_active_locks():
+        locks = LocksManager._load_locks()
+        return LocksManager._clean_expired_locks(locks)
 
     @staticmethod
     def _clean_expired_locks(locks):
         current_time = time.time()
-        # Remove locks antigos (> 1 hora)
-        expired = [k for k, v in locks.items()
-                   if current_time - v.get('timestamp', 0) > LOCK_TIMEOUT]
-        for k in expired:
-            del locks[k]
+        expired = [k for k, v in locks.items() if current_time - v.get("timestamp", 0) > LOCK_TIMEOUT]
+        for key in expired:
+            del locks[key]
         return locks
 
     @staticmethod
@@ -105,15 +138,21 @@ class LocksManager:
         def _add_lock(locks):
             lock_key = f"{maquina}|{saida}"
             locks[lock_key] = {
-                'maquina': maquina,
-                'saida': saida,
-                'operador': operador,
-                'pedido': pedido,
-                'pid': os.getpid(),
-                'timestamp': time.time()
+                "maquina": maquina,
+                "saida": saida,
+                "operador": operador,
+                "pedido": pedido,
+                "owner_id": LocksManager._get_owner_id(),
+                "timestamp": time.time(),
             }
             return locks
-        LocksManager._modify_locks_safely(_add_lock)
+
+        result = LocksManager._modify_locks_safely(_add_lock)
+        if result:
+            print(f"[LOCKS] Lock adquirido: {maquina}|{saida} (operador: {operador})")
+        else:
+            print(f"[LOCKS] FALHA ao adquirir lock: {maquina}|{saida}")
+        return result
 
     @staticmethod
     def release_lock(maquina, saida):
@@ -122,16 +161,23 @@ class LocksManager:
             if lock_key in locks:
                 del locks[lock_key]
             return locks
-        LocksManager._modify_locks_safely(_del_lock)
+
+        result = LocksManager._modify_locks_safely(_del_lock)
+        if result:
+            print(f"[LOCKS] Lock liberado: {maquina}|{saida}")
+        else:
+            print(f"[LOCKS] FALHA ao liberar lock: {maquina}|{saida}")
+        return result
 
     @staticmethod
     def release_all_locks_for_pid():
         def _del_pid_locks(locks):
-            current_pid = os.getpid()
-            to_remove = [k for k, v in locks.items() if v.get('pid') == current_pid]
-            for k in to_remove:
-                del locks[k]
+            owner_id = LocksManager._get_owner_id()
+            to_remove = [k for k, v in locks.items() if v.get("owner_id") == owner_id]
+            for key in to_remove:
+                del locks[key]
             return locks
+
         LocksManager._modify_locks_safely(_del_pid_locks)
 
     @staticmethod
@@ -140,7 +186,7 @@ class LocksManager:
         locks = LocksManager._clean_expired_locks(locks)
         lock_key = f"{maquina}|{saida}"
         if lock_key in locks:
-            if locks[lock_key].get('pid') == os.getpid():
+            if locks[lock_key].get("owner_id") == LocksManager._get_owner_id():
                 return False
             return True
         return False
@@ -151,9 +197,8 @@ class LocksManager:
         locks = LocksManager._clean_expired_locks(locks)
         locked = []
         for lock_data in locks.values():
-            if lock_data.get('maquina') == maquina:
-                if lock_data.get('pid') != os.getpid():
-                    saida = lock_data.get('saida')
-                    if saida and saida not in locked:
-                        locked.append(saida)
+            if lock_data.get("maquina") == maquina and lock_data.get("owner_id") != LocksManager._get_owner_id():
+                saida = lock_data.get("saida")
+                if saida and saida not in locked:
+                    locked.append(saida)
         return locked

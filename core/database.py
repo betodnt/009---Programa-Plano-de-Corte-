@@ -1,8 +1,9 @@
 import os
-import time
 import shutil
-from contextlib import contextmanager
+import tempfile
+import time
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
 
 
 class SimpleLockFile:
@@ -30,7 +31,6 @@ class SimpleLockFile:
                 pass
             if time.time() - start_time > timeout_sec:
                 return False
-            # Sleep um pouco maior para reduzir contenção de rede
             time.sleep(0.2)
 
     def unlock(self):
@@ -57,6 +57,22 @@ def xml_lock(file_path):
 
 class DatabaseManager:
     @staticmethod
+    def _write_xml_atomic(tree, file_path):
+        dirpath = os.path.dirname(file_path) or "."
+        os.makedirs(dirpath, exist_ok=True)
+        temp_fd, temp_path = tempfile.mkstemp(dir=dirpath, prefix=".dados_tmp_", suffix=".xml")
+        try:
+            with os.fdopen(temp_fd, "wb") as temp_file:
+                tree.write(temp_file, encoding="utf-8", xml_declaration=True)
+            os.replace(temp_path, file_path)
+        except Exception:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+            raise
+
+    @staticmethod
     def _auto_backup(file_path):
         try:
             dirpath = os.path.dirname(file_path)
@@ -73,7 +89,7 @@ class DatabaseManager:
             try:
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 root = ET.Element("Dados")
-                ET.ElementTree(root).write(file_path, encoding="utf-8", xml_declaration=True)
+                DatabaseManager._write_xml_atomic(ET.ElementTree(root), file_path)
             except Exception:
                 pass
 
@@ -82,7 +98,7 @@ class DatabaseManager:
         DatabaseManager.initialize_xml_if_needed(file_path)
         with xml_lock(file_path) as acquired:
             if not acquired:
-                return False, "O servidor está ocupado salvando outro registro. Tente novamente em alguns segundos."
+                return False, "O servidor esta ocupado salvando outro registro. Tente novamente em alguns segundos."
             try:
                 tree = ET.parse(file_path)
                 root = tree.getroot()
@@ -95,11 +111,10 @@ class DatabaseManager:
                 ET.SubElement(entrada, "Tipo").text = str(tipo)
                 ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
                 ET.SubElement(entrada, "Instancia").text = str(os.getpid())
-                tree.write(file_path, encoding="utf-8", xml_declaration=True)
+                DatabaseManager._write_xml_atomic(tree, file_path)
                 DatabaseManager._auto_backup(file_path)
                 return True, ""
             except Exception as e:
-                # CRÍTICO: Não criar novo XML se falhar o parse e o arquivo já existir
                 if not os.path.exists(file_path):
                     try:
                         root = ET.Element("Dados")
@@ -112,11 +127,11 @@ class DatabaseManager:
                         ET.SubElement(entrada, "Tipo").text = str(tipo)
                         ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
                         ET.SubElement(entrada, "Instancia").text = str(os.getpid())
-                        ET.ElementTree(root).write(file_path, encoding="utf-8", xml_declaration=True)
+                        DatabaseManager._write_xml_atomic(ET.ElementTree(root), file_path)
                         DatabaseManager._auto_backup(file_path)
                         return True, ""
                     except Exception as inner_e:
-                         return False, f"Erro ao criar novo XML: {inner_e}"
+                        return False, f"Erro ao criar novo XML: {inner_e}"
                 return False, f"Erro ao ler XML (arquivo corrompido ou bloqueado): {e}"
 
     @staticmethod
@@ -145,7 +160,7 @@ class DatabaseManager:
                     ET.SubElement(entrada, "Saida").text = "Finalizacao Direta"
                     ET.SubElement(entrada, "DataHoraTermino").text = str(dt_termino)
                     ET.SubElement(entrada, "TempoDecorrido").text = str(tempo_decorrido)
-                tree.write(file_path, encoding="utf-8", xml_declaration=True)
+                DatabaseManager._write_xml_atomic(tree, file_path)
                 DatabaseManager._auto_backup(file_path)
                 return True, ""
             except Exception as e:
