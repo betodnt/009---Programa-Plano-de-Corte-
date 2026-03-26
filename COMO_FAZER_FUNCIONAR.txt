@@ -1,0 +1,65 @@
+COMO FAZER A APLICACAO FUNCIONAR
+
+1. Requisitos
+- Windows
+- Python 3.12 instalado
+- Tkinter habilitado no Python
+
+2. Abrir a pasta do projeto
+- Entre na pasta onde esta este arquivo.
+- Se quiser usar o ambiente virtual do projeto, abra o PowerShell nessa pasta e execute:
+  .\.venv\Scripts\Activate.ps1
+
+3. Conferir a configuracao
+- O arquivo principal de configuracao e o config.ini.
+- Hoje ele usa pastas locais dentro de .\Public, entao a aplicacao pode funcionar localmente sem rede.
+- Se quiser usar rede compartilhada, veja tambem:
+  GUIA_REDE_COMPARTILHADA.md
+
+4. Estrutura usada pela aplicacao
+- Entradas CNC: .\Public\saidas_cnc
+- Saidas cortadas: .\Public\saidas_cortadas
+- Plano de corte: .\Public\plano_corte
+- Dados XML: .\Public\dados\dados_{data}.xml
+- Locks do sistema: .\Public\app_data\active_locks.json
+
+5. Como iniciar a aplicacao principal
+- Jeito mais simples:
+  clique duas vezes em Iniciar_CorteDobra.bat
+- Pelo terminal:
+  python main.py
+
+6. Como iniciar informando a maquina
+- Arquivo .bat:
+  Iniciar_CorteDobra_Com_ID.bat "Bodor1 (12K)"
+- Pelo PowerShell:
+  $env:PCP_MACHINE_ID="Bodor1 (12K)"
+  python main.py
+
+7. Como abrir o monitor
+- Jeito mais simples:
+  clique duas vezes em Abrir_Monitor.bat
+- Pelo terminal:
+  python monitor_app.py
+
+8. Como abrir o monitor com maquina definida
+- Arquivo .bat:
+  Abrir_Monitor_Com_ID.bat "Bodor1 (12K)"
+- Pelo PowerShell:
+  $env:PCP_MACHINE_ID="Bodor1 (12K)"
+  python monitor_app.py
+
+9. Se der erro ao iniciar
+- Verifique se o comando abaixo funciona:
+  python --version
+- Se nao funcionar, instale o Python 3.12 e marque a opcao para adicionar ao PATH.
+- Se abrir uma mensagem de erro ao iniciar o sistema principal, confira o arquivo:
+  error.log
+- Confirme se o arquivo config.ini existe e se os caminhos apontados nele estao corretos.
+- Confirme se a pasta Public e suas subpastas existem.
+
+10. Observacoes importantes
+- A aplicacao principal abre por main.py.
+- O monitor abre por monitor_app.py.
+- O sistema foi encontrado neste ambiente rodando com Python 3.12.10.
+- Nao foi identificado uso de bibliotecas externas obrigatorias no codigo atual.
