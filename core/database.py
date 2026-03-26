@@ -94,7 +94,7 @@ class DatabaseManager:
                 pass
 
     @staticmethod
-    def save_entrada(file_path, pedido, operador, maquina, retalho, saida, tipo, dt_inicio):
+    def save_entrada(file_path, pedido, operador, maquina, retalho, saida, tipo, dt_inicio, operation_id=""):
         DatabaseManager.initialize_xml_if_needed(file_path)
         with xml_lock(file_path) as acquired:
             if not acquired:
@@ -102,15 +102,32 @@ class DatabaseManager:
             try:
                 tree = ET.parse(file_path)
                 root = tree.getroot()
-                entrada = ET.SubElement(root, "Entrada")
-                ET.SubElement(entrada, "Pedido").text = str(pedido)
-                ET.SubElement(entrada, "Operador").text = str(operador)
-                ET.SubElement(entrada, "Maquina").text = str(maquina)
-                ET.SubElement(entrada, "Chapa").text = str(retalho)
-                ET.SubElement(entrada, "Saida").text = str(saida)
-                ET.SubElement(entrada, "Tipo").text = str(tipo)
-                ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
-                ET.SubElement(entrada, "Instancia").text = str(os.getpid())
+                entrada = None
+                if operation_id:
+                    for existing in root.findall("Entrada"):
+                        if existing.findtext("OperationId", "") == str(operation_id):
+                            entrada = existing
+                            break
+
+                if entrada is None:
+                    entrada = ET.SubElement(root, "Entrada")
+
+                for tag, value in (
+                    ("Pedido", pedido),
+                    ("Operador", operador),
+                    ("Maquina", maquina),
+                    ("Chapa", retalho),
+                    ("Saida", saida),
+                    ("Tipo", tipo),
+                    ("DataHoraInicio", dt_inicio),
+                    ("OperationId", operation_id),
+                    ("Instancia", os.getpid()),
+                ):
+                    node = entrada.find(tag)
+                    if node is None:
+                        node = ET.SubElement(entrada, tag)
+                    if not node.text:
+                        node.text = str(value)
                 DatabaseManager._write_xml_atomic(tree, file_path)
                 DatabaseManager._auto_backup(file_path)
                 return True, ""
@@ -126,6 +143,7 @@ class DatabaseManager:
                         ET.SubElement(entrada, "Saida").text = str(saida)
                         ET.SubElement(entrada, "Tipo").text = str(tipo)
                         ET.SubElement(entrada, "DataHoraInicio").text = str(dt_inicio)
+                        ET.SubElement(entrada, "OperationId").text = str(operation_id)
                         ET.SubElement(entrada, "Instancia").text = str(os.getpid())
                         DatabaseManager._write_xml_atomic(ET.ElementTree(root), file_path)
                         DatabaseManager._auto_backup(file_path)
@@ -135,7 +153,7 @@ class DatabaseManager:
                 return False, f"Erro ao ler XML (arquivo corrompido ou bloqueado): {e}"
 
     @staticmethod
-    def save_termino(file_path, pedido, operador, maquina, dt_termino, tempo_decorrido):
+    def save_termino(file_path, pedido, operador, maquina, dt_termino, tempo_decorrido, operation_id="", saida=""):
         DatabaseManager.initialize_xml_if_needed(file_path)
         with xml_lock(file_path) as acquired:
             if not acquired:
@@ -145,19 +163,39 @@ class DatabaseManager:
                 root = tree.getroot()
                 found = False
                 for entrada in reversed(root.findall("Entrada")):
+                    op_tag = entrada.findtext("OperationId", "")
+                    if operation_id and op_tag == str(operation_id):
+                        if entrada.find("DataHoraTermino") is not None:
+                            return True, ""
+                        ET.SubElement(entrada, "DataHoraTermino").text = str(dt_termino)
+                        ET.SubElement(entrada, "TempoDecorrido").text = str(tempo_decorrido)
+                        found = True
+                        break
+
+                    if entrada.find("DataHoraTermino") is not None:
+                        continue
+
                     p_tag = entrada.find("Pedido")
-                    if p_tag is not None and p_tag.text == str(pedido):
-                        if entrada.find("DataHoraTermino") is None:
-                            ET.SubElement(entrada, "DataHoraTermino").text = str(dt_termino)
-                            ET.SubElement(entrada, "TempoDecorrido").text = str(tempo_decorrido)
-                            found = True
-                            break
+                    m_tag = entrada.findtext("Maquina", "")
+                    s_tag = entrada.findtext("Saida", "")
+                    if (
+                        not operation_id
+                        and p_tag is not None
+                        and p_tag.text == str(pedido)
+                        and m_tag == str(maquina)
+                        and (not saida or s_tag == str(saida))
+                    ):
+                        ET.SubElement(entrada, "DataHoraTermino").text = str(dt_termino)
+                        ET.SubElement(entrada, "TempoDecorrido").text = str(tempo_decorrido)
+                        found = True
+                        break
                 if not found:
                     entrada = ET.SubElement(root, "Entrada")
                     ET.SubElement(entrada, "Pedido").text = str(pedido)
                     ET.SubElement(entrada, "Operador").text = str(operador)
                     ET.SubElement(entrada, "Maquina").text = str(maquina)
-                    ET.SubElement(entrada, "Saida").text = "Finalizacao Direta"
+                    ET.SubElement(entrada, "Saida").text = str(saida) if saida else "Finalizacao Direta"
+                    ET.SubElement(entrada, "OperationId").text = str(operation_id)
                     ET.SubElement(entrada, "DataHoraTermino").text = str(dt_termino)
                     ET.SubElement(entrada, "TempoDecorrido").text = str(tempo_decorrido)
                 DatabaseManager._write_xml_atomic(tree, file_path)

@@ -1,10 +1,8 @@
 import os
 import sys
 import threading
-import time
 import tkinter as tk
 import tkinter.font as tkfont
-import xml.etree.ElementTree as ET
 from datetime import datetime
 from tkinter import ttk
 from typing import Any, cast
@@ -12,9 +10,8 @@ from typing import Any, cast
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.config import ConfigManager
-from core.locks import LocksManager
+from core.monitor_service import MonitorService
 
-WARNING_THRESHOLD = 3600
 REFRESH_INTERVAL_MS = 5000
 
 BG_DARK = "#2b2b2b"
@@ -241,65 +238,19 @@ class MonitorApp(tk.Tk):
             "history_items": [],
             "history_total": 0,
             "count": 0,
-            "status_text": time.strftime("atualizado %H:%M:%S"),
+            "status_text": "",
             "status_color": FG_DIM,
+            "xml_mtime": self._last_xml_mtime,
+            "cached_history_items": self._cached_history_items,
         }
         try:
-            today_str = datetime.now().strftime("%d/%m/%Y")
-            locks = LocksManager.get_active_locks() if self.view_date == today_str else {}
-            now = time.time()
-
-            active_items = []
-            for key, data in sorted(locks.items(), key=lambda item: item[1].get("timestamp", 0)):
-                operador = data.get("operador") or "-"
-                maquina = data.get("maquina") or "-"
-                pedido = data.get("pedido") or "-"
-                plano = data.get("saida") or "-"
-                elapsed = int(now - data.get("timestamp", now))
-                duracao = self._fmt_duration(elapsed)
-                tags = ("delayed",) if elapsed > WARNING_THRESHOLD else ("active",)
-                payload["active_items"].append(
-                    {
-                        "iid": key,
-                        "values": (operador, maquina, pedido, plano, duracao, ""),
-                        "tags": tags,
-                    }
-                )
-                active_items.append(key)
-
-            xml_path = ConfigManager.get_k8_data_path(self.view_date)
-            history_items = []
-            if os.path.exists(xml_path):
-                try:
-                    current_mtime = os.stat(xml_path).st_mtime
-                    if current_mtime != self._last_xml_mtime or not self._cached_history_items:
-                        tree = ET.parse(xml_path)
-                        root = tree.getroot()
-                        temp_items = []
-                        for entrada in root.findall("Entrada"):
-                            if entrada.find("DataHoraTermino") is None:
-                                continue
-                            operador = entrada.findtext("Operador", "-")
-                            maquina = entrada.findtext("Maquina", "-")
-                            pedido = entrada.findtext("Pedido", "-")
-                            plano = entrada.findtext("Saida", "-")
-                            duracao = entrada.findtext("TempoDecorrido", "-")
-                            dt_term = entrada.findtext("DataHoraTermino", "")
-                            hora_conclusao = dt_term.split(" ")[1] if " " in dt_term else dt_term
-                            temp_items.append((operador, maquina, pedido, plano, duracao, hora_conclusao))
-                        self._cached_history_items = temp_items[::-1]
-                        self._last_xml_mtime = current_mtime
-                    history_items = self._cached_history_items
-                except Exception:
-                    payload["status_text"] = "falha ao ler historico XML"
-                    payload["status_color"] = RED
-            else:
-                self._cached_history_items = []
-                self._last_xml_mtime = 0
-
-            payload["history_items"] = history_items[:100]
-            payload["history_total"] = len(history_items)
-            payload["count"] = len(active_items)
+            payload = MonitorService.load_snapshot(
+                self.view_date,
+                last_xml_mtime=self._last_xml_mtime,
+                cached_history_items=self._cached_history_items,
+            )
+            self._last_xml_mtime = payload.get("xml_mtime", 0)
+            self._cached_history_items = payload.get("cached_history_items", [])
         finally:
             self._is_loading = False
             if not self._destroyed:
@@ -325,16 +276,6 @@ class MonitorApp(tk.Tk):
         )
         self.lbl_status.config(text=payload["status_text"], foreground=payload["status_color"])
         self.after(1, self._adjust_tree_columns)
-
-    @staticmethod
-    def _fmt_duration(seconds):
-        h = seconds // 3600
-        m = (seconds % 3600) // 60
-        s = seconds % 60
-        if h > 0:
-            return f"{h:02d}:{m:02d}:{s:02d}"
-        return f"{m:02d}:{s:02d}"
-
 
 if __name__ == "__main__":
     app = MonitorApp()

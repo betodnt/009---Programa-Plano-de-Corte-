@@ -1,23 +1,25 @@
 import os
-import tkinter as tk
-from tkinter import ttk, messagebox
-import webbrowser
-from datetime import datetime
 import sys
 import threading
-import time
+import tkinter as tk
+import webbrowser
+from datetime import datetime
+from tkinter import messagebox, ttk
 
+from core.application_service import ApplicationService
 from core.config import ConfigManager
-from core.database import DatabaseManager
-from core.search import SearchFilesRunner, SearchPdfRunner
 from core.file_ops import FileOperationRunner
-from core.operators import OperatorsManager
+from core.file_search_service import FileSearchService
 from core.locks import LocksManager
+from core.logging_service import LoggingService
+from core.operation_service import OperationService
+from core.operators import OperatorsManager
+from core.search import SearchFilesRunner, SearchPdfRunner
 
-from gui.form_panel import FormPanel
 from gui.action_panel import ActionPanel
-from gui.history_panel import HistoryPanel
 from gui.config_dialog import ConfigDialog
+from gui.form_panel import FormPanel
+from gui.history_panel import HistoryPanel
 
 
 class ProgressDialog(tk.Toplevel):
@@ -30,14 +32,20 @@ class ProgressDialog(tk.Toplevel):
         self.transient(master)
         self.grab_set()
 
-        self.lbl_texto = tk.Label(self, text="Aguarde...", bg="#2b2b2b", fg="#ffffff",
-                                  font=("Segoe UI", 11), justify="center")
+        self.lbl_texto = tk.Label(
+            self,
+            text="Aguarde...",
+            bg="#2b2b2b",
+            fg="#ffffff",
+            font=("Segoe UI", 11),
+            justify="center",
+        )
         self.lbl_texto.pack(pady=(15, 10))
 
-        mode = 'determinate' if max_val > 0 else 'indeterminate'
+        mode = "determinate" if max_val > 0 else "indeterminate"
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=250, mode=mode)
         if max_val > 0:
-            self.progress['maximum'] = max_val
+            self.progress["maximum"] = max_val
         self.progress.pack()
 
         if max_val == 0:
@@ -62,7 +70,7 @@ class ProgressDialog(tk.Toplevel):
     def set_progress(self, current, text=None):
         if text:
             self.lbl_texto.config(text=text)
-        self.progress['value'] = current
+        self.progress["value"] = current
 
     def close(self):
         try:
@@ -75,7 +83,8 @@ class AppWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Controle de Corte e Dobra")
-        self.geometry("1000x550")
+        self.geometry("1120x640")
+        self.minsize(1020, 600)
 
         ConfigManager.load_settings()
 
@@ -87,23 +96,28 @@ class AppWindow(tk.Tk):
 
         self.active_runner = None
         self.progress_win = None
+        self.active_operation_id = ""
+        self.current_operation = None
+        self.current_finish = None
+        self._lock_heartbeat_stop = None
+        self._lock_heartbeat_thread = None
+        self._sync_in_progress = False
 
         self.after(500, self._refresh_recent_operators)
         self.after(1000, self._update_saidas_if_needed)
+        self.after(1500, self._schedule_runtime_status)
+        self.after(3000, self._schedule_pending_sync)
 
     def _update_saidas_if_needed(self):
-        # Move a verificação de locks (I/O de arquivo) para uma thread
-        if self.form_panel._all_saidas and self.form_panel.cbox_saida.cget('state') == 'readonly':
+        if self.form_panel._all_saidas and self.form_panel.cbox_saida.cget("state") == "readonly":
             threading.Thread(target=self._background_check_locks, daemon=True).start()
-        
+
         self.after(5000, self._update_saidas_if_needed)
 
     def _background_check_locks(self):
         try:
-            # Apenas busca os locks, não atualiza UI aqui
             maquina = self.form_panel.var_maquina.get()
-            locked_saidas = LocksManager.get_locked_saidas(maquina)
-            # Agenda atualização da UI
+            locked_saidas = OperationService.get_locked_saidas(maquina)
             self.after_idle(lambda: self.form_panel.apply_locked_saidas_filter(locked_saidas))
         except Exception:
             pass
@@ -111,68 +125,148 @@ class AppWindow(tk.Tk):
     def on_closing(self):
         if self.active_runner and self.active_runner.thread.is_alive():
             self.active_runner.cancel()
+        self._stop_lock_heartbeat()
         LocksManager.release_all_locks_for_pid()
+        LoggingService.write("application_closing", active_operation_id=self.active_operation_id)
         self.quit()
         sys.exit(0)
 
+    def _start_lock_heartbeat(self, maquina, saida):
+        self._stop_lock_heartbeat()
+        stop_event = threading.Event()
+        self._lock_heartbeat_stop = stop_event
+
+        def _heartbeat():
+            while not stop_event.wait(15):
+                try:
+                    if not LocksManager.touch_lock(maquina, saida):
+                        break
+                except Exception:
+                    break
+
+        self._lock_heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
+        self._lock_heartbeat_thread.start()
+
+    def _stop_lock_heartbeat(self):
+        if self._lock_heartbeat_stop:
+            self._lock_heartbeat_stop.set()
+        self._lock_heartbeat_stop = None
+        self._lock_heartbeat_thread = None
+
+    def _schedule_pending_sync(self):
+        self._flush_pending_sync()
+        self.after(15000, self._schedule_pending_sync)
+
+    def _schedule_runtime_status(self):
+        self._refresh_runtime_status()
+        self.after(10000, self._schedule_runtime_status)
+
+    def _refresh_runtime_status(self):
+        status = ApplicationService.get_runtime_status()
+        self.action_panel.set_status(status["summary"], status["level"])
+        if status["queue_status"]["pending"] > 0:
+            LoggingService.write("runtime_status_warning", status=status)
+
+    def _flush_pending_sync(self):
+        if self._sync_in_progress:
+            return
+        self._sync_in_progress = True
+
+        def _worker():
+            result = ApplicationService.flush_pending_sync()
+
+            def _finish():
+                self._sync_in_progress = False
+                self._refresh_runtime_status()
+                if result.get("synced", 0) > 0:
+                    self.history_panel.refresh_history()
+                    self.show_toast(f"{result['synced']} sincronizado(s)", duration=1500)
+
+            self.after_idle(_finish)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _setup_styles(self):
         style = ttk.Style(self)
-        bg_dark      = "#2b2b2b"
-        bg_field     = "#3c3f41"
-        fg_white     = "#ffffff"
-        accent_blue  = "#4a90e2"
+        bg_dark = "#2b2b2b"
+        bg_panel = "#2f3136"
+        bg_field = "#3c3f41"
+        fg_white = "#ffffff"
+        fg_soft = "#d8d8d8"
+        accent_blue = "#4a90e2"
         accent_green = "#27ae60"
-        accent_red   = "#c0392b"
+        accent_red = "#c0392b"
         accent_timer = "#f39c12"
 
         self.configure(bg=bg_dark)
-        style.theme_use('clam')
+        style.theme_use("clam")
 
         style.configure("TFrame", background=bg_dark)
-        style.configure("TLabel", background=bg_dark, foreground="#e0e0e0", font=("Segoe UI", 11))
-        style.configure("TEntry",
-            fieldbackground=bg_field, foreground=fg_white, insertcolor=fg_white,
-            borderwidth=1, relief="flat", padding=5)
-        style.configure("TCombobox",
-            fieldbackground=bg_field, foreground=fg_white, background=bg_field,
-            arrowcolor=fg_white, borderwidth=1, relief="flat", padding=4)
-        style.map("TCombobox",
-            fieldbackground=[('readonly', bg_field)],
-            foreground=[('readonly', fg_white)],
-            lightcolor=[('focus', accent_blue)],
-            darkcolor=[('focus', accent_blue)])
-        style.configure("TButton",
-            font=("Segoe UI", 10, "bold"), padding=(20, 8),
-            background=bg_field, foreground=fg_white, borderwidth=1, relief="flat")
-        style.map("TButton",
-            background=[('active', "#4e5254")],
-            foreground=[('active', fg_white)],
-            relief=[('pressed', 'groove'), ('!pressed', 'flat')])
-        style.configure("Action.TButton", font=("Segoe UI", 12, "bold"), padding=(25, 12))
+        style.configure("Panel.TFrame", background=bg_panel)
+        style.configure("Inline.TFrame", background=bg_dark)
+        style.configure("TLabel", background=bg_dark, foreground=fg_soft, font=("Segoe UI", 11))
+        style.configure("Section.TLabel", background=bg_dark, foreground=fg_soft, font=("Segoe UI", 10, "bold"))
+        style.configure("MachineValue.TLabel", background=bg_dark, foreground=fg_white, font=("Segoe UI", 28, "bold"))
+        style.configure(
+            "TEntry",
+            fieldbackground=bg_field,
+            foreground=fg_white,
+            insertcolor=fg_white,
+            borderwidth=1,
+            relief="flat",
+            padding=6,
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground=bg_field,
+            foreground=fg_white,
+            background=bg_field,
+            arrowcolor=fg_white,
+            borderwidth=1,
+            relief="flat",
+            padding=5,
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", bg_field)],
+            foreground=[("readonly", fg_white)],
+            lightcolor=[("focus", accent_blue)],
+            darkcolor=[("focus", accent_blue)],
+        )
+        style.configure(
+            "TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=(18, 8),
+            background=bg_field,
+            foreground=fg_white,
+            borderwidth=1,
+            relief="flat",
+        )
+        style.configure("Compact.TButton", font=("Segoe UI", 9, "bold"), padding=(12, 6), background=bg_field, foreground=fg_white)
+        style.map(
+            "TButton",
+            background=[("active", "#4e5254")],
+            foreground=[("active", fg_white)],
+            relief=[("pressed", "groove"), ("!pressed", "flat")],
+        )
+        style.configure("Action.TButton", font=("Segoe UI", 12, "bold"), padding=(24, 12))
         style.configure("Iniciar.Action.TButton", background=accent_green, foreground="white", borderwidth=0)
-        style.map("Iniciar.Action.TButton", background=[('active', "#2ecc71"), ('disabled', "#555555")])
+        style.map("Iniciar.Action.TButton", background=[("active", "#2ecc71"), ("disabled", "#555555")])
         style.configure("Finalizar.Action.TButton", background=accent_red, foreground="white", borderwidth=0)
-        style.map("Finalizar.Action.TButton", background=[('active', "#e74c3c"), ('disabled', "#555555")])
+        style.map("Finalizar.Action.TButton", background=[("active", "#e74c3c"), ("disabled", "#555555")])
         style.configure("Timer.TLabel", foreground=accent_timer, font=("Segoe UI", 36, "bold"), background=bg_dark)
-        style.configure("Treeview",
-            background=bg_dark, foreground=fg_white, fieldbackground=bg_dark,
-            borderwidth=0, font=("Segoe UI", 10))
-        style.configure("Treeview.Heading",
-            background=bg_field, foreground=fg_white, relief="flat", font=("Segoe UI", 10, "bold"))
-        style.map("Treeview", background=[('selected', accent_blue)])
+        style.configure("Treeview", background=bg_dark, foreground=fg_white, fieldbackground=bg_dark, borderwidth=0, rowheight=28, font=("Segoe UI", 10))
+        style.configure("Treeview.Heading", background=bg_field, foreground=fg_white, relief="flat", font=("Segoe UI", 10, "bold"))
+        style.map("Treeview", background=[("selected", accent_blue)])
 
         style.element_create("My.Vertical.Scrollbar.trough", "from", "default")
         style.element_create("My.Vertical.Scrollbar.thumb", "from", "default")
-        style.layout("My.Vertical.TScrollbar", [
-            ('My.Vertical.Scrollbar.trough', {
-                'children': [('My.Vertical.Scrollbar.thumb', {'expand': '1', 'sticky': 'nswe'})],
-                'sticky': 'ns'
-            })
-        ])
-        style.configure("My.Vertical.TScrollbar",
-            background="#444444", troughcolor=bg_dark, borderwidth=0, arrowsize=0, width=8)
-        style.map("My.Vertical.TScrollbar",
-            background=[('active', "#555555"), ('pressed', "#666666")])
+        style.layout(
+            "My.Vertical.TScrollbar",
+            [("My.Vertical.Scrollbar.trough", {"children": [("My.Vertical.Scrollbar.thumb", {"expand": "1", "sticky": "nswe"})], "sticky": "ns"})],
+        )
+        style.configure("My.Vertical.TScrollbar", background="#444444", troughcolor=bg_dark, borderwidth=0, arrowsize=0, width=8)
+        style.map("My.Vertical.TScrollbar", background=[("active", "#555555"), ("pressed", "#666666")])
 
     def _load_icon(self):
         base_dir = os.path.dirname(os.path.dirname(__file__))
@@ -184,62 +278,78 @@ class AppWindow(tk.Tk):
                 self.iconphoto(True, self.icon_photo)
             if os.path.exists(icon_ico_path):
                 self.iconbitmap(icon_ico_path)
-        except Exception as e:
-            print(f"Erro ao carregar ícone: {e}")
+        except Exception as exc:
+            print(f"Erro ao carregar icone: {exc}")
 
     def open_settings(self):
         config_win = ConfigDialog(self)
         self.wait_window(config_win)
-        # Atualizar a exibição da máquina após fechar as configurações
         self.form_panel.update_machine_display()
 
     def _build_ui(self):
-        main_container = ttk.Frame(self, padding="10")
+        main_container = ttk.Frame(self, padding=(12, 12, 12, 12))
         main_container.pack(fill="both", expand=True)
+        main_container.columnconfigure(0, weight=3)
+        main_container.columnconfigure(1, weight=7)
+        main_container.rowconfigure(0, weight=1)
 
-        self.history_panel = HistoryPanel(main_container, ConfigManager.get_k8_data_path, width=280)
-        self.history_panel.pack(side="left", fill="both", expand=False, padx=(0, 20))
+        history_card = ttk.Frame(main_container, style="Panel.TFrame")
+        history_card.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
+        history_card.columnconfigure(0, weight=1)
+        history_card.rowconfigure(0, weight=1)
+        self.history_panel = HistoryPanel(history_card, ConfigManager.get_k8_data_path)
+        self.history_panel.grid(row=0, column=0, sticky="nsew")
 
         right_panel = ttk.Frame(main_container)
-        right_panel.pack(side="right", fill="both", expand=True)
+        right_panel.grid(row=0, column=1, sticky="nsew")
+        right_panel.columnconfigure(0, weight=1)
+        right_panel.rowconfigure(0, weight=1)
+        right_panel.rowconfigure(1, weight=0)
 
-        self.form_panel = FormPanel(right_panel, self.handle_search, self.handle_open_pdf, self.open_settings)
-        self.form_panel.pack(fill="x", pady=(0, 20))
+        form_card = ttk.Frame(right_panel, style="Panel.TFrame")
+        form_card.grid(row=0, column=0, sticky="nsew", pady=(0, 14))
+        form_card.columnconfigure(0, weight=1)
+        form_card.rowconfigure(0, weight=1)
+        self.form_panel = FormPanel(form_card, self.handle_search, self.handle_open_pdf, self.open_settings)
+        self.form_panel.grid(row=0, column=0, sticky="nsew")
         self.form_panel.cbox_operador.bind("<<ComboboxSelected>>", self._on_operator_changed)
 
-        ttk.Frame(right_panel).pack(fill="both", expand=True)
-
-        self.action_panel = ActionPanel(right_panel, self.handle_iniciar, self.handle_finalizar)
-        self.action_panel.pack(fill="x", pady=(20, 20), padx=(0, 20))
+        action_card = ttk.Frame(right_panel, style="Panel.TFrame")
+        action_card.grid(row=1, column=0, sticky="ew")
+        action_card.columnconfigure(0, weight=1)
+        self.action_panel = ActionPanel(action_card, self.handle_iniciar, self.handle_finalizar)
+        self.action_panel.grid(row=0, column=0, sticky="ew")
 
     def handle_search(self):
         dados = self.form_panel.get_data()
-        pedido = dados["pedido"]
-        if not pedido:
+        request = FileSearchService.build_request(dados["pedido"], dados["tipo"])
+        if not request.pedido:
             return
 
-        base_path = ConfigManager.get_server_path()
-
+        ok, message = FileSearchService.validate_search(request)
         self.form_panel.update_saidas([])
         self.form_panel.disable_fields()
-        self.action_panel.btn_iniciar.state(['disabled'])
+        self.action_panel.btn_iniciar.state(["disabled"])
 
-        if not os.path.exists(base_path):
+        if not ok:
+            LoggingService.write("search_validation_failed", pedido=request.pedido, tipo=request.tipo, message=message)
             messagebox.showwarning(
-                "Caminho inválido",
-                f"O diretório base para as saídas CNC não existe:\n{base_path}\n\nVerifique as configurações.")
+                "Caminho invalido",
+                message,
+            )
             self.form_panel.enable_fields()
-            self.action_panel.btn_iniciar.state(['!disabled'])
+            self.action_panel.btn_iniciar.state(["!disabled"])
             return
 
         self.progress_win = ProgressDialog(self, title="Buscando arquivos CNC...", max_val=0)
-
+        LoggingService.write("search_started", pedido=request.pedido, tipo=request.tipo, base_path=request.base_path)
         self.active_runner = SearchFilesRunner(
-            pedido=pedido,
-            tipo=dados["tipo"],
-            base_path=base_path,
+            pedido=request.pedido,
+            tipo=request.tipo,
+            base_path=request.base_path,
             on_progress_update=self.on_search_progress,
-            on_finished=self.on_search_finished)
+            on_finished=self.on_search_finished,
+        )
         self._check_runner_cancel()
         self.active_runner.start()
 
@@ -247,8 +357,7 @@ class AppWindow(tk.Tk):
         toast = tk.Toplevel(self)
         toast.overrideredirect(True)
         toast.attributes("-topmost", True)
-        label = tk.Label(toast, text=message, bg="#34495e", fg="#ffffff",
-                         padx=60, pady=30, font=("Segoe UI", 36, "bold"))
+        label = tk.Label(toast, text=message, bg="#34495e", fg="#ffffff", padx=60, pady=30, font=("Segoe UI", 36, "bold"))
         label.pack()
         self.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() // 2) - (label.winfo_reqwidth() // 2)
@@ -272,6 +381,7 @@ class AppWindow(tk.Tk):
                     self.progress_win.set_progress(current)
                 except Exception:
                     pass
+
         self.after_idle(safe_update)
 
     def on_search_finished(self, results):
@@ -280,11 +390,13 @@ class AppWindow(tk.Tk):
                 self.progress_win.close()
             self.form_panel.update_saidas(results)
             self.form_panel.enable_fields()
-            self.action_panel.btn_iniciar.state(['!disabled'])
+            self.action_panel.btn_iniciar.state(["!disabled"])
+            LoggingService.write("search_finished", total=len(results), results=results[:20])
             if not results and not (self.progress_win and self.progress_win.is_canceled):
-                messagebox.showinfo("Aviso", "Não foi encontrada nenhuma saída CNC para este pedido.")
+                messagebox.showinfo("Aviso", "Nao foi encontrada nenhuma saida CNC para este pedido.")
             self.active_runner = None
             self.progress_win = None
+
         self.after_idle(finalize)
 
     def on_file_op_finished(self, err_msg, success_title):
@@ -293,87 +405,84 @@ class AppWindow(tk.Tk):
                 self.progress_win.close()
 
             if err_msg:
+                LoggingService.write("file_operation_failed", stage=success_title, error=err_msg, operation_id=self.active_operation_id)
                 if success_title == "INICIADO":
                     dados = self.form_panel.get_data()
-                    LocksManager.release_lock(dados["maquina"], dados["saida"])
+                    self._stop_lock_heartbeat()
+                    OperationService.rollback_start(dados)
+                    self.active_operation_id = ""
+                    self.current_operation = None
                 self.action_panel.stop_timer()
                 self.action_panel.lbl_timer.config(text="00:00:00")
                 self.form_panel.enable_fields()
-                self.action_panel.btn_iniciar.state(['!disabled'])
-                self.action_panel.btn_finalizar.state(['disabled'])
+                self.action_panel.btn_iniciar.state(["!disabled"])
+                self.action_panel.btn_finalizar.state(["disabled"])
                 messagebox.showwarning("Aviso de Rede", err_msg)
             else:
+                LoggingService.write("file_operation_finished", stage=success_title, operation_id=self.active_operation_id)
                 if success_title == "INICIADO":
-                    # Salva a entrada após a cópia bem-sucedida
                     dados = self.form_panel.get_data()
-                    saida = dados["saida"]
-                    dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
-                    file_path = ConfigManager.get_k8_data_path()
-                    DatabaseManager.save_entrada(
-                        file_path, dados["pedido"], dados["operador"], dados["maquina"],
-                        dados["retalho"], saida, dados["tipo"], dt_inicio)
+                    feedback = OperationService.complete_start(dados, self.current_operation)
+                    if feedback.level == "warning":
+                        messagebox.showwarning(feedback.dialog_title, feedback.dialog_message)
                     self.show_toast("Corte Iniciado!")
-                    if saida:
-                        nif_path = os.path.join(ConfigManager.get_server_path(),
-                                                saida.replace(".cnc", ".nif"))
-                        if os.path.exists(nif_path):
-                            webbrowser.open(f"file://{nif_path}")
+                    if feedback.nif_path:
+                        webbrowser.open(f"file://{feedback.nif_path}")
                 else:
-                    # Salva o término após a movimentação bem-sucedida
                     dados = self.form_panel.get_data()
-                    dt_termino = self.end_time.strftime("%Y-%m-%d %H:%M:%S")
-                    file_path = ConfigManager.get_k8_data_path()
-                    ok, err = DatabaseManager.save_termino(
-                        file_path, dados["pedido"], dados["operador"], dados["maquina"], dt_termino, self.elapsed_time)
-                    LocksManager.release_lock(dados["maquina"], dados["saida"])
+                    self._stop_lock_heartbeat()
+                    feedback = OperationService.complete_finish(dados, self.current_finish, success_title)
+                    self.active_operation_id = ""
+                    self.current_operation = None
+                    self.current_finish = None
                     self.form_panel.update_saidas(self.form_panel._all_saidas)
                     self.history_panel.current_operator = dados["operador"]
                     self.history_panel.refresh_history()
                     self.form_panel.enable_fields()
-                    self.action_panel.btn_iniciar.state(['!disabled'])
-                    self.action_panel.btn_finalizar.state(['disabled'])
+                    self.action_panel.btn_iniciar.state(["!disabled"])
+                    self.action_panel.btn_finalizar.state(["disabled"])
                     self.action_panel.lbl_timer.config(text="00:00:00")
-                    messagebox.showinfo("Sucesso", success_title)
+                    if feedback.level == "info":
+                        messagebox.showinfo(feedback.dialog_title, feedback.dialog_message)
+                    else:
+                        messagebox.showwarning(feedback.dialog_title, feedback.dialog_message)
 
             self.active_runner = None
             self.progress_win = None
+
         self.after_idle(finalize)
 
     def handle_iniciar(self):
         dados = self.form_panel.get_data()
-        saida = dados["saida"]
-        if not saida:
+        if not dados["saida"]:
             return False
 
-        if not dados["operador"].strip():
-            messagebox.showwarning("Operador obrigatório", "Informe o nome do operador antes de iniciar.")
+        operation_start, message = OperationService.prepare_start(dados)
+        if not operation_start:
+            if "ja esta sendo usada" in message:
+                messagebox.showwarning("Saida Indisponivel", message)
+            elif "Informe o nome do operador" in message:
+                messagebox.showwarning("Operador obrigatorio", message)
+            else:
+                messagebox.showerror("Erro de Rede", message)
             return False
 
-        if LocksManager.is_locked(dados["maquina"], saida):
-            messagebox.showwarning("Saída Indisponível",
-                f"A saída '{saida}' já está sendo usada por outro operador na máquina '{dados['maquina']}'.\n\nEscolha outra saída ou aguarde a finalização.")
-            return False
-
-        self.start_time = datetime.now()
-        dt_inicio = self.start_time.strftime("%Y-%m-%d %H:%M:%S")
-
-        OperatorsManager.add_operator(dados["operador"])
-        if not LocksManager.acquire_lock(dados["maquina"], saida, dados["operador"], dados["pedido"]):
-            messagebox.showerror("Erro de Rede", "Não foi possível acessar o arquivo de controle na rede. Verifique se outra máquina está salvando dados.")
-            return False
+        self.current_operation = operation_start
+        self.start_time = operation_start.start_time
+        self.active_operation_id = operation_start.operation_id
+        LoggingService.write("start_clicked", operation_id=self.active_operation_id, data=dados)
+        self._start_lock_heartbeat(dados["maquina"], dados["saida"])
 
         self.form_panel.disable_fields()
         self._refresh_recent_operators()
 
-        src_path = os.path.join(ConfigManager.get_server_path(), saida)
-        dst_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
-        
-        # Garante que a pasta local de destino exista
-        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-
         self.progress_win = ProgressDialog(self, title="Copiando arquivo CNC...", max_val=0)
-        self.active_runner = FileOperationRunner("COPY", src_path, dst_path,
-                                                 lambda e: self.on_file_op_finished(e, "INICIADO"))
+        self.active_runner = FileOperationRunner(
+            "COPY",
+            operation_start.src_path,
+            operation_start.dst_path,
+            lambda err: self.on_file_op_finished(err, "INICIADO"),
+        )
         self.active_runner.start()
         return True
 
@@ -383,22 +492,23 @@ class AppWindow(tk.Tk):
         if not saida:
             return
 
-        # Ask for confirmation
-        if not messagebox.askyesno("Confirmar Finalização", f"Tem certeza que deseja finalizar a saída '{saida}'?"):
+        if not messagebox.askyesno("Confirmar Finalizacao", f"Tem certeza que deseja finalizar a saida '{saida}'?"):
             return
 
         self.end_time = datetime.now()
         self.elapsed_time = self.action_panel.get_elapsed_time_string()
-
-        src_path = os.path.join(ConfigManager.get_saidas_cnc_path(), saida)
-        dst_path = os.path.join(ConfigManager.get_saidas_cortadas_path(), saida)
-
-        # Garante que a pasta de destino na rede/local exista
-        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        LoggingService.write("finish_clicked", operation_id=self.active_operation_id, data=dados, elapsed_time=self.elapsed_time)
+        self.current_finish = OperationService.prepare_finish(dados, self.active_operation_id, self.elapsed_time)
+        if not self.current_finish:
+            return
 
         self.progress_win = ProgressDialog(self, title="Movendo arquivo CNC...", max_val=0)
-        self.active_runner = FileOperationRunner("MOVE", src_path, dst_path,
-                                                 lambda e: self.on_file_op_finished(e, "Corte Finalizado com sucesso!"))
+        self.active_runner = FileOperationRunner(
+            "MOVE",
+            self.current_finish.src_path,
+            self.current_finish.dst_path,
+            lambda err: self.on_file_op_finished(err, "Corte Finalizado com sucesso!"),
+        )
         self.active_runner.start()
 
         self.after(700, self._refresh_recent_operators)
@@ -407,9 +517,11 @@ class AppWindow(tk.Tk):
         saida = self.form_panel.get_data()["saida"]
         if not saida:
             return
+
         pdf_name = saida.replace(".cnc", ".pdf")
         self.progress_win = ProgressDialog(self, title="Procurando PDF na Rede...", max_val=0)
         search_path = ConfigManager.get_server_path()
+        LoggingService.write("pdf_search_started", pdf_name=pdf_name, search_path=search_path)
         self.active_runner = SearchPdfRunner(pdf_name, search_path, self.on_pdf_search_finished)
         self._check_runner_cancel()
         self.active_runner.start()
@@ -419,11 +531,14 @@ class AppWindow(tk.Tk):
             if self.progress_win:
                 self.progress_win.close()
             if not found_path and not (self.progress_win and self.progress_win.is_canceled):
-                messagebox.showwarning("Não Encontrado", "O arquivo PDF correspondente não foi encontrado na base.")
+                LoggingService.write("pdf_search_not_found", pdf_name=self.form_panel.get_data()["saida"].replace(".cnc", ".pdf"))
+                messagebox.showwarning("Nao Encontrado", "O arquivo PDF correspondente nao foi encontrado na base.")
             elif found_path:
+                LoggingService.write("pdf_search_found", found_path=found_path)
                 webbrowser.open(f"file://{found_path}")
             self.active_runner = None
             self.progress_win = None
+
         self.after_idle(finalize)
 
     def _on_operator_changed(self, event=None):
@@ -433,15 +548,11 @@ class AppWindow(tk.Tk):
     def _refresh_recent_operators(self):
         operators = OperatorsManager.get_recent_operators(10)
         self.form_panel.update_operators(operators)
-        
+
         if operators:
-            # Seleciona o operador mais recente automaticamente
             self.form_panel.cbox_operador.current(0)
-            # Força a atualização da variável para garantir que o _on_operator_changed receba o valor
             self.form_panel.var_operador.set(operators[0])
             self._on_operator_changed()
 
-        # Carrega a visualização do histórico diário ao iniciar
-        # Um pequeno delay garante que a interface gráfica esteja pronta antes de buscar os dados
-        if hasattr(self.history_panel, 'refresh_history'):
+        if hasattr(self.history_panel, "refresh_history"):
             self.after(200, self.history_panel.refresh_history)

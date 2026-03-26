@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Dados><Entrada><Pedido>1234</Pedido><Operador>Teste</Operador><Maquina>MAQ-01</Maquina><Chapa>Nao</Chapa><Saida>A100.cnc</Saida><Tipo>Corte</Tipo><DataHoraInicio>2026-03-25 20:36:38</DataHoraInicio><OperationId>3955d75d1952459686debbcca5cbb68f</OperationId><Instancia>30604</Instancia><DataHoraTermino>2026-03-25 20:36:38</DataHoraTermino><TempoDecorrido>00:01:00</TempoDecorrido></Entrada></Dados>

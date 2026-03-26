@@ -1,9 +1,9 @@
-import tkinter as tk
-from tkinter import ttk
-import xml.etree.ElementTree as ET
 import os
 import threading
+import xml.etree.ElementTree as ET
 from collections import deque
+from tkinter import ttk
+
 
 class HistoryPanel(ttk.Frame):
     def __init__(self, master, get_xml_path_func, **kwargs):
@@ -21,30 +21,27 @@ class HistoryPanel(ttk.Frame):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
-        self.lbl_title = ttk.Label(self, text="HISTÓRICO", font=("Segoe UI", 10, "bold"))
-        self.lbl_title.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=(0, 4))
+        self.lbl_title = ttk.Label(self, text="HISTORICO", style="Section.TLabel")
+        self.lbl_title.grid(row=0, column=0, columnspan=2, sticky="w", padx=(12, 12), pady=(12, 6))
 
         columns = ("pedido", "saida", "tempo")
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=12)  # Reduzido de 15 para 12
-
+        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=12)
         self.tree.heading("pedido", text="PEDIDO")
-        self.tree.heading("saida", text="SAÍDA")
+        self.tree.heading("saida", text="SAIDA")
         self.tree.heading("tempo", text="TEMPO")
 
-        self.tree.column("pedido", width=80, anchor="center", stretch=True)
-        self.tree.column("saida", width=120, anchor="w", stretch=True)
-        self.tree.column("tempo", width=60, anchor="center", stretch=True)
+        self.tree.column("pedido", width=86, anchor="center", stretch=True)
+        self.tree.column("saida", width=146, anchor="w", stretch=True)
+        self.tree.column("tempo", width=74, anchor="center", stretch=True)
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=(12, 0), pady=(0, 12))
 
-        self.tree.grid(row=1, column=0, sticky="nswe")
-
-        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview, style="My.Vertical.TScrollbar")
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview, style="My.Vertical.TScrollbar")
         self.tree.configure(yscrollcommand=self.scrollbar.set)
 
-        # Responsivo: ajusta colunas ao redimensionar painel
         self.bind("<Configure>", self._on_resize)
         self.after(100, self._adjust_columns)
 
-    def _on_resize(self, event=None):
+    def _on_resize(self, _event=None):
         self._adjust_columns()
 
     def _adjust_columns(self):
@@ -53,42 +50,20 @@ class HistoryPanel(ttk.Frame):
             if total <= 10:
                 return
 
-            # Otimização: só recalcular se largura mudou significativamente
-            if not hasattr(self, '_last_width') or abs(total - self._last_width) > 30:
-                self._last_width = total
-
-                # Estimativa simples baseada no comprimento do texto
-                ratios = {
-                    'pedido': 0.26,
-                    'saida': 0.54,
-                    'tempo': 0.20,
-                }
-                for col, ratio in ratios.items():
-                    header = self.tree.heading(col, "text")
-                    min_width = max(60, len(str(header)) * 8)  # Estimativa simples
-                    width = max(min_width, int(total * ratio))
-                    self.tree.column(col, width=width, stretch=True)
-            else:
-                # Apenas ajustar proporções
-                ratios = {
-                    'pedido': 0.26,
-                    'saida': 0.54,
-                    'tempo': 0.20,
-                }
-                for col, ratio in ratios.items():
-                    width = int(total * ratio)
-                    self.tree.column(col, width=width, stretch=True)
+            ratios = {"pedido": 0.27, "saida": 0.51, "tempo": 0.22}
+            for col, ratio in ratios.items():
+                self.tree.column(col, width=max(70, int(total * ratio)), stretch=True)
         except Exception:
             pass
 
         self.after(100, self.update_scrollbar)
 
-    def update_scrollbar(self, event=None):
+    def update_scrollbar(self, _event=None):
         y_scroll = self.tree.yview()
         if y_scroll[0] <= 0 and y_scroll[1] >= 1:
             self.scrollbar.grid_remove()
         else:
-            self.scrollbar.grid(row=1, column=1, sticky="ns")
+            self.scrollbar.grid(row=1, column=1, sticky="ns", padx=(0, 12), pady=(0, 12))
 
     def refresh_history(self):
         if self._loading:
@@ -101,36 +76,28 @@ class HistoryPanel(ttk.Frame):
         rows = []
         if os.path.exists(xml_path):
             try:
-                # Otimização: iterparse carrega o XML via stream (baixo consumo de memória)
-                # deque(maxlen=N) mantém automaticamente apenas os N últimos itens (mais recentes)
                 target_op = self.current_operator.strip().lower()
-                max_entries = 30
-                recent_rows = deque(maxlen=max_entries)
+                recent_rows = deque(maxlen=30)
 
-                # events=("start", "end") permite limpar a raiz para liberar memória
                 context = ET.iterparse(xml_path, events=("start", "end"))
                 context = iter(context)
-                event, root = next(context) # Pega a referência da raiz
+                _event, root = next(context)
 
                 for event, elem in context:
                     if event == "end" and elem.tag == "Entrada":
                         op_text = elem.findtext("Operador", "")
-                        # Filtra pelo operador (case insensitive)
                         if not target_op or (op_text and op_text.strip().lower() == target_op):
                             tempo = elem.findtext("TempoDecorrido", "")
-                            # Só mostra finalizados (que tem tempo decorrido)
                             if tempo:
                                 pedido = elem.findtext("Pedido", "")
                                 saida = elem.findtext("Saida", "")
                                 recent_rows.append((pedido, saida, tempo))
-                        
-                        root.clear() # Limpa memória processada imediatamente
-                
-                # Inverte para mostrar o mais recente no topo da lista
+                        root.clear()
+
                 rows = list(recent_rows)
                 rows.reverse()
-            except Exception as e:
-                print(f"Error reading history XML: {e}")
+            except Exception as exc:
+                print(f"Error reading history XML: {exc}")
         self.after(0, lambda: self._apply_history_rows(rows))
 
     def _apply_history_rows(self, rows):

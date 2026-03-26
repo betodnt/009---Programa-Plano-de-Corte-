@@ -1,0 +1,6 @@
+{"timestamp": "2026-03-25 21:16:48", "event_type": "sync_flush", "machine": "Bodor1 (12K)", "result": {"synced": 0, "errors": 0, "remaining": 0}}
+{"timestamp": "2026-03-25 21:17:03", "event_type": "sync_flush", "machine": "Bodor1 (12K)", "result": {"synced": 0, "errors": 0, "remaining": 0}}
+{"timestamp": "2026-03-25 21:17:18", "event_type": "sync_flush", "machine": "Bodor1 (12K)", "result": {"synced": 0, "errors": 0, "remaining": 0}}
+{"timestamp": "2026-03-25 21:17:33", "event_type": "sync_flush", "machine": "Bodor1 (12K)", "result": {"synced": 0, "errors": 0, "remaining": 0}}
+{"timestamp": "2026-03-25 21:17:48", "event_type": "sync_flush", "machine": "Bodor1 (12K)", "result": {"synced": 0, "errors": 0, "remaining": 0}}
+{"timestamp": "2026-03-25 21:17:48", "event_type": "application_closing", "machine": "Bodor1 (12K)", "active_operation_id": ""}

@@ -58,6 +58,10 @@ class LocksManager:
         return f"{socket.gethostname()}-{os.getpid()}"
 
     @staticmethod
+    def _now():
+        return time.time()
+
+    @staticmethod
     def _load_locks():
         locks_file = _get_locks_file()
         if not os.path.exists(locks_file):
@@ -127,47 +131,81 @@ class LocksManager:
 
     @staticmethod
     def _clean_expired_locks(locks):
-        current_time = time.time()
-        expired = [k for k, v in locks.items() if current_time - v.get("timestamp", 0) > LOCK_TIMEOUT]
+        current_time = LocksManager._now()
+        expired = [
+            k
+            for k, v in locks.items()
+            if current_time - v.get("heartbeat_at", v.get("timestamp", 0)) > LOCK_TIMEOUT
+        ]
         for key in expired:
             del locks[key]
         return locks
 
     @staticmethod
-    def acquire_lock(maquina, saida, operador="", pedido=""):
+    def acquire_lock(maquina, saida, operador="", pedido="", operation_id=""):
+        outcome = {"ok": False}
+
         def _add_lock(locks):
             lock_key = f"{maquina}|{saida}"
+            existing = locks.get(lock_key)
+            if existing and existing.get("owner_id") != LocksManager._get_owner_id():
+                return None
+
+            now = LocksManager._now()
             locks[lock_key] = {
                 "maquina": maquina,
                 "saida": saida,
                 "operador": operador,
                 "pedido": pedido,
+                "operation_id": operation_id,
                 "owner_id": LocksManager._get_owner_id(),
-                "timestamp": time.time(),
+                "timestamp": existing.get("timestamp", now) if existing else now,
+                "heartbeat_at": now,
             }
+            outcome["ok"] = True
             return locks
 
         result = LocksManager._modify_locks_safely(_add_lock)
-        if result:
+        if result and outcome["ok"]:
             print(f"[LOCKS] Lock adquirido: {maquina}|{saida} (operador: {operador})")
         else:
             print(f"[LOCKS] FALHA ao adquirir lock: {maquina}|{saida}")
-        return result
+        return bool(result and outcome["ok"])
 
     @staticmethod
-    def release_lock(maquina, saida):
+    def release_lock(maquina, saida, force=False):
+        released = {"ok": False}
+
         def _del_lock(locks):
             lock_key = f"{maquina}|{saida}"
-            if lock_key in locks:
+            existing = locks.get(lock_key)
+            if existing and (force or existing.get("owner_id") == LocksManager._get_owner_id()):
                 del locks[lock_key]
+                released["ok"] = True
             return locks
 
         result = LocksManager._modify_locks_safely(_del_lock)
-        if result:
+        if result and released["ok"]:
             print(f"[LOCKS] Lock liberado: {maquina}|{saida}")
         else:
             print(f"[LOCKS] FALHA ao liberar lock: {maquina}|{saida}")
-        return result
+        return bool(result and released["ok"])
+
+    @staticmethod
+    def touch_lock(maquina, saida):
+        touched = {"ok": False}
+
+        def _touch(locks):
+            lock_key = f"{maquina}|{saida}"
+            existing = locks.get(lock_key)
+            if not existing or existing.get("owner_id") != LocksManager._get_owner_id():
+                return None
+            existing["heartbeat_at"] = LocksManager._now()
+            touched["ok"] = True
+            return locks
+
+        result = LocksManager._modify_locks_safely(_touch)
+        return bool(result and touched["ok"])
 
     @staticmethod
     def release_all_locks_for_pid():

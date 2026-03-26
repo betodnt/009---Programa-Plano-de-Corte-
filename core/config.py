@@ -48,6 +48,7 @@ class ConfigManager:
             ConfigManager._app_path("Public", "plano_corte"),
             ConfigManager._app_path("Public", "dados"),
             ConfigManager._app_path("Public", "app_data"),
+            ConfigManager._app_path("Public", "app_data", "logs"),
         ]
         for directory in local_dirs:
             try:
@@ -70,6 +71,32 @@ class ConfigManager:
         return path_str
 
     @staticmethod
+    def _format_template(value, extra_vars=None):
+        if not value:
+            return value
+
+        template_vars = {}
+        if extra_vars:
+            template_vars.update(extra_vars)
+
+        if "machine" not in template_vars:
+            machine_id = os.getenv("PCP_MACHINE_ID")
+            if machine_id:
+                template_vars["machine"] = machine_id
+            else:
+                ConfigManager._ensure_loaded()
+                config = ConfigManager._config_cache
+                if config and config.has_section("Machine"):
+                    template_vars["machine"] = config.get("Machine", "current_machine", fallback="Bodor1 (12K)")
+                else:
+                    template_vars["machine"] = "Bodor1 (12K)"
+
+        try:
+            return str(value).format(**template_vars)
+        except KeyError:
+            return value
+
+    @staticmethod
     def _create_default_config():
         ConfigManager._ensure_runtime_layout()
         config = configparser.ConfigParser()
@@ -81,10 +108,13 @@ class ConfigManager:
             "PlanoCorte": "./Public/plano_corte",
             "DadosXml": "./Public/dados/dados_{date}.xml",
             "LocksFile": "./Public/app_data/active_locks.json",
+            "OfflineQueueDir": "./Public/app_data/offline_queue/{machine}",
+            "LogsDir": "./Public/app_data/logs",
         }
         config["Machine"] = {
+            "machine_name": "Bodor1 (12K)",
             "current_machine": "Bodor1 (12K)",
-            "available_machines": "Bodor1 (12K), Bodor2 (6K), Bodor3 (4K), Trumpf1, Trumpf2",
+            "available_machines": "Bodor1 (12K), Bodor2 (6K), Bodor3 (4K), Bodor4 (3K), Trumpf1, Trumpf2",
         }
         config["Auth"] = {
             "admin_user": "PCP01",
@@ -115,13 +145,13 @@ class ConfigManager:
         ConfigManager._config_cache = config
 
     @staticmethod
-    def _get_path(key, default_val):
+    def _get_path(key, default_val, extra_vars=None):
         ConfigManager._ensure_loaded()
         config = ConfigManager._config_cache
         if config and config.has_section("Paths"):
             path = config.get("Paths", key, fallback=default_val).strip('"').strip("'")
-            return ConfigManager._resolve_path(path)
-        return ConfigManager._resolve_path(default_val)
+            return ConfigManager._resolve_path(ConfigManager._format_template(path, extra_vars))
+        return ConfigManager._resolve_path(ConfigManager._format_template(default_val, extra_vars))
 
     @staticmethod
     def get_server_path():
@@ -154,14 +184,14 @@ class ConfigManager:
 
         env_xml = os.getenv("PCP_DADOS_XML")
         if env_xml:
-            return ConfigManager._resolve_path(env_xml.replace("{date}", date_str))
+            return ConfigManager._resolve_path(ConfigManager._format_template(env_xml, {"date": date_str}))
 
-        config_val = ConfigManager._get_path("DadosXml", "")
-        if config_val and "{date}" in config_val:
-            return config_val.replace("{date}", date_str)
+        config_val = ConfigManager._get_path("DadosXml", "", {"date": date_str})
 
         if not config_val or config_val.endswith("dados.xml"):
-            return ConfigManager._resolve_path(f"./Public/dados/dados_{date_str}.xml")
+            return ConfigManager._resolve_path(
+                ConfigManager._format_template(f"./Public/dados/dados_{date_str}.xml", {"date": date_str})
+            )
 
         return config_val
 
@@ -173,8 +203,22 @@ class ConfigManager:
     def get_locks_file_path():
         env_locks = os.getenv("PCP_LOCKS_FILE")
         if env_locks:
-            return ConfigManager._resolve_path(env_locks)
+            return ConfigManager._resolve_path(ConfigManager._format_template(env_locks))
         return ConfigManager._get_path("LocksFile", "./Public/app_data/active_locks.json")
+
+    @staticmethod
+    def get_offline_queue_dir():
+        env_queue = os.getenv("PCP_OFFLINE_QUEUE_DIR")
+        if env_queue:
+            return ConfigManager._resolve_path(ConfigManager._format_template(env_queue))
+        return ConfigManager._get_path("OfflineQueueDir", "./Public/app_data/offline_queue/{machine}")
+
+    @staticmethod
+    def get_logs_dir():
+        env_logs = os.getenv("PCP_LOGS_DIR")
+        if env_logs:
+            return ConfigManager._resolve_path(ConfigManager._format_template(env_logs))
+        return ConfigManager._get_path("LogsDir", "./Public/app_data/logs")
 
     @staticmethod
     def get_current_machine():
@@ -184,8 +228,11 @@ class ConfigManager:
 
         ConfigManager._ensure_loaded()
         config = ConfigManager._config_cache
-        if config and config.has_section("Machine") and config.has_option("Machine", "current_machine"):
-            machine = config.get("Machine", "current_machine").strip('"').strip("'")
+        if config and config.has_section("Machine"):
+            machine_name = config.get("Machine", "machine_name", fallback="").strip('"').strip("'")
+            if machine_name:
+                return machine_name
+            machine = config.get("Machine", "current_machine", fallback="").strip('"').strip("'")
             if machine:
                 return machine
         machines = ConfigManager.get_available_machines()
@@ -198,6 +245,7 @@ class ConfigManager:
             "Bodor1 (12K)",
             "Bodor2 (6K)",
             "Bodor3 (4K)",
+            "Bodor4 (3K)",
             "Trumpf1",
             "Trumpf2",
         ]
@@ -255,7 +303,7 @@ class ConfigManager:
             config.add_section("Machine")
 
         for key, value in new_settings.items():
-            if key in ["current_machine", "available_machines"]:
+            if key in ["machine_name", "current_machine", "available_machines"]:
                 config.set("Machine", key, str(value))
             else:
                 config.set("Paths", key, str(value))
