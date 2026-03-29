@@ -1,0 +1,165 @@
+   Compiling plano-corte-backend v0.1.0 (C:\Users\dent_\Desktop\Projetos\009---Programa-Plano-de-Corte-\src-tauri)
+error[E0428]: the name `__cmd__get_runtime_config` is defined multiple times
+  --> src\commands\config_commands.rs:7:1
+   |
+ 7 | #[tauri::command]
+   | ^^^^^^^^^^^^^^^^^ `__cmd__get_runtime_config` redefined here
+   |
+  ::: src\commands\system.rs:18:1
+   |
+18 | #[tauri::command]
+   | ----------------- previous definition of the macro `__cmd__get_runtime_config` here
+   |
+   = note: `__cmd__get_runtime_config` must be defined only once in the macro namespace of this module
+   = note: this error originates in the attribute macro `tauri::command` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: could not find `db` in the crate root
+ --> src\commands\health_commands.rs:4:5
+  |
+4 |     db::models::{BackendStatus, DatabaseCheckResult},
+  |     ^^ could not find `db` in the crate root
+
+error[E0433]: failed to resolve: could not find `services` in the crate root
+ --> src\commands\health_commands.rs:6:5
+  |
+6 |     services::health_service::HealthService,
+  |     ^^^^^^^^ could not find `services` in the crate root
+
+error[E0433]: failed to resolve: could not find `db` in the crate root
+ --> src\commands\config_commands.rs:2:5
+  |
+2 |     db::models::RuntimeConfig,
+  |     ^^ could not find `db` in the crate root
+
+error[E0433]: failed to resolve: could not find `services` in the crate root
+ --> src\commands\config_commands.rs:4:5
+  |
+4 |     services::config_service::ConfigService,
+  |     ^^^^^^^^ could not find `services` in the crate root
+
+error[E0433]: failed to resolve: could not find `db` in the crate root
+ --> src\commands\monitor_commands.rs:4:5
+  |
+4 |     db::models::MonitorSnapshot,
+  |     ^^ could not find `db` in the crate root
+
+error[E0433]: failed to resolve: could not find `services` in the crate root
+ --> src\commands\monitor_commands.rs:6:5
+  |
+6 |     services::monitor_service::MonitorService,
+  |     ^^^^^^^^ could not find `services` in the crate root
+
+error[E0433]: failed to resolve: could not find `db` in the crate root
+ --> src\commands\operation_commands.rs:4:5
+  |
+4 |     db::models::{
+  |     ^^ could not find `db` in the crate root
+
+error[E0433]: failed to resolve: could not find `services` in the crate root
+ --> src\commands\operation_commands.rs:9:5
+  |
+9 |     services::operation_service::OperationService,
+  |     ^^^^^^^^ could not find `services` in the crate root
+
+error[E0433]: failed to resolve: could not find `db` in the crate root
+ --> src\commands\file_commands.rs:4:5
+  |
+4 |     db::models::{OpenPdfInput, SearchCncInput, SearchCncResult},
+  |     ^^ could not find `db` in the crate root
+
+error[E0433]: failed to resolve: could not find `services` in the crate root
+ --> src\commands\file_commands.rs:6:5
+  |
+6 |     services::{config_service::ConfigService, file_service::FileService},
+  |     ^^^^^^^^ could not find `services` in the crate root
+
+warning: unused imports: `DateTime` and `Local`
+ --> src\models.rs:2:14
+  |
+2 | use chrono::{DateTime, Local};
+  |              ^^^^^^^^  ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `AppError`
+ --> src\commands\system.rs:1:20
+  |
+1 | use crate::error::{AppError, ErrorResponse};
+  |                    ^^^^^^^^
+
+error[E0282]: type annotations needed
+  --> src\commands\health_commands.rs:14:5
+   |
+14 | /     HealthService::backend_status(state)
+15 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\health_commands.rs:23:5
+   |
+23 | /     HealthService::test_database_connection(state)
+24 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\monitor_commands.rs:14:5
+   |
+14 | /     MonitorService::get_snapshot(state)
+15 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\operation_commands.rs:17:5
+   |
+17 | /     OperationService::bootstrap_database(state)
+18 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\operation_commands.rs:27:5
+   |
+27 | /     OperationService::start_operation(state, input)
+28 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\operation_commands.rs:37:5
+   |
+37 | /     OperationService::finish_operation(state, input)
+38 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\operation_commands.rs:47:5
+   |
+47 | /     OperationService::touch_lock(state, input)
+48 | |         .await
+   | |______________^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> src\commands\operation_commands.rs:56:5
+   |
+56 | /     OperationService::get_bootstrap_data(state)
+57 | |         .await
+   | |______________^ cannot infer type
+
+error[E0277]: the size for values of type `str` cannot be known at compilation time
+   --> src\commands\file_commands.rs:27:12
+    |
+ 27 |     if let Some(path) = FileService::find_pdf(&pdf_filename, base_path).map_err(AppError::from)? {
+    |            ^^^^^^^^^^ doesn't have a size known at compile-time
+    |
+    = help: the trait `Sized` is not implemented for `str`
+note: required by a bound in `std::prelude::v1::Some`
+   --> C:\Users\dent_\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\core\src\option.rs:600:17
+    |
+600 | pub enum Option<T> {
+    |                 ^ required by this bound in `std::prelude::v1::Some`
+...
+608 |     Some(#[stable(feature = "rust1", since = "1.0.0")] T),
+    |     ---- required by a bound in this tuple variant
+
+Some errors have detailed explanations: E0277, E0282, E0428, E0433.
+For more information about an error, try `rustc --explain E0277`.
+warning: `plano-corte-backend` (lib) generated 2 warnings
+error: could not compile `plano-corte-backend` (lib) due to 20 previous errors; 2 warnings emitted
