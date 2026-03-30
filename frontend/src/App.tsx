@@ -24,7 +24,6 @@ const initialForm: StartOperationInput = {
 export default function App() {
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
   const [status, setStatus] = useState<BackendStatus | null>(null);
-  const [dbCheck, setDbCheck] = useState<DatabaseCheckResult | null>(null);
   const [bootstrapData, setBootstrapData] = useState<BootstrapData | null>(null);
   const [monitor, setMonitor] = useState<MonitorSnapshot | null>(null);
   
@@ -32,7 +31,6 @@ export default function App() {
   const [availableSaidas, setAvailableSaidas] = useState<string[]>([]);
   
   const [activeOperationId, setActiveOperationId] = useState('');
-  const [startResult, setStartResult] = useState<StartOperationResult | null>(null);
   const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(false);
   const [timerString, setTimerString] = useState('00:00:00');
@@ -79,7 +77,6 @@ export default function App() {
       setRuntime(runtimeValue);
       setStatus(statusValue);
       
-      // Carregar dados de maquinas e operadores
       await handleLoadBootstrapData();
       await handleRefreshMonitor();
     } catch (error) {
@@ -123,7 +120,6 @@ export default function App() {
         pedido: form.pedido,
         tipo: form.tipo,
       });
-      // Filter out mapped entries if already locked
       const currentlyLocked = monitor?.active_locks.map((l) => l.saida) || [];
       const available = result.files.filter((f) => !currentlyLocked.includes(f));
       
@@ -161,7 +157,6 @@ export default function App() {
     setLoading(true);
     try {
       const result = await tauriClient.startOperation(form);
-      setStartResult(result);
       setActiveOperationId(result.operation_id);
       showFeedback('Corte Iniciado com Sucesso!');
       startTimer();
@@ -200,7 +195,6 @@ export default function App() {
     }
   }
 
-  /* Heartbeat / Timer logic */
   async function sendHeartbeat() {
     if (!activeOperationId) return;
     try {
@@ -241,92 +235,81 @@ export default function App() {
 
   const isFormDisabled = loading || activeOperationId !== '';
 
+  const inputClass = "w-full bg-[#3c3f41] text-[#ffffff] px-[6px] py-[6px] border border-[#3c3f41] focus:border-[#4a90e2] outline-none disabled:bg-[#3c3f41] disabled:opacity-80";
+
   return (
-    <main className="min-h-screen bg-[#2b2b2b] text-[#d8d8d8] font-sans flex flex-col">
-      <header className="bg-[#2f3136] px-6 py-4 flex items-center justify-between border-b border-[#1e1e1e]">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-wide">Controle de Corte e Dobra</h1>
-          <p className="text-sm opacity-60">Maquina: <span className="text-[#4a90e2] font-semibold">{runtime?.machine_name || 'Desconhecida'}</span></p>
+    <div className="h-screen w-screen bg-[#2b2b2b] p-3 flex overflow-hidden font-['Segoe_UI'] text-[14px]">
+      
+      {/* Historico Card (Left Panel - 30%) */}
+      <div className="w-[30%] bg-[#2f3136] flex flex-col mr-3.5">
+        <div className="px-3 py-3 relative z-10">
+          <span className="text-[#d8d8d8] font-bold text-[13px] tracking-wide">HISTORICO</span>
         </div>
-        <div className="flex gap-4">
-          <div className="flex flex-col text-right">
-             <span className="text-xs uppercase opacity-50">Ambiente</span>
-             <strong className="text-sm text-white">{runtime?.app_env || '---'}</strong>
-          </div>
-          <div className="flex flex-col text-right">
-             <span className="text-xs uppercase opacity-50">Banco</span>
-             <strong className={`text-sm ${status?.database_connected ? 'text-[#27ae60]' : 'text-[#c0392b]'}`}>
-               {status?.database_connected ? 'Conectado' : 'Desconectado'}
-             </strong>
-          </div>
+        <div className="flex-1 overflow-x-auto overflow-y-auto px-3 pb-3 relative">
+          <table className="w-full text-left text-[13px] border-none border-collapse text-[#ffffff]">
+            <thead className="bg-[#3c3f41] sticky top-0 z-20 shadow-sm font-bold">
+              <tr>
+                <th className="px-1.5 py-1 font-bold text-center w-[27%]">PEDIDO</th>
+                <th className="px-1.5 py-1 font-bold w-[51%]">SAIDA</th>
+                <th className="px-1.5 py-1 font-bold text-center w-[22%]">TEMPO</th>
+              </tr>
+            </thead>
+            <tbody className="bg-[#2b2b2b]">
+              {(monitor?.active_operations ?? []).map((op) => (
+                <tr key={op.operation_id} className="h-[28px] hover:bg-[#4a90e2] transition-colors cursor-default">
+                  <td className="px-1.5 text-center truncate max-w-[80px]">{op.pedido}</td>
+                  <td className="px-1.5 truncate max-w-[140px]" title={op.saida}>{op.saida}</td>
+                  <td className="px-1.5 text-center">{formatDate(op.started_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </header>
+      </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row p-6 gap-6">
+      {/* Right Container - 70% */}
+      <div className="flex-1 flex flex-col">
         
-        {/* Lado Esquerdo - Monitor e Historico */}
-        <section className="flex-1 lg:w-1/3 flex flex-col gap-6">
-          <div className="bg-[#2f3136] rounded-xl border border-[#3c3f41] p-5 shadow-lg flex-1">
-            <h2 className="text-lg font-bold text-white mb-4 border-b border-[#3c3f41] pb-2">Histórico (Em Andamento)</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#3c3f41] text-white">
-                  <tr>
-                    <th className="p-2 rounded-tl-md">Pedido</th>
-                    <th className="p-2">Operador</th>
-                    <th className="p-2">Saída</th>
-                    <th className="p-2 rounded-tr-md">Tempo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#3c3f41]">
-                  {(monitor?.active_operations ?? []).map((op) => (
-                    <tr key={op.operation_id} className="hover:bg-[#383a40] transition-colors">
-                      <td className="p-2 font-medium">{op.pedido}</td>
-                      <td className="p-2">{op.operator_name}</td>
-                      <td className="p-2 truncate max-w-[120px]" title={op.saida}>{op.saida}</td>
-                      <td className="p-2 text-[#f39c12]">{formatDate(op.started_at)}</td>
-                    </tr>
-                  ))}
-                  {(monitor?.active_operations?.length === 0) && (
-                    <tr>
-                      <td colSpan={4} className="p-4 text-center opacity-50 italic">Nenhum corte em andamento.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        {/* Lado Direito - Formulario de Iniciar */}
-        <section className="flex-[2] flex flex-col gap-6">
-          <div className="bg-[#2f3136] rounded-xl border border-[#3c3f41] p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-white mb-6 border-b border-[#3c3f41] pb-2">Dados do Corte</h2>
-            <form onSubmit={handleStartOperation} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-bold opacity-80 uppercase">Operador</span>
+        {/* Form Card */}
+        <div className="bg-[#2f3136] flex-1 mb-3.5 flex flex-col justify-center">
+          <form onSubmit={handleStartOperation} className="px-2.5 py-3 flex flex-col gap-4">
+            
+            <div className="grid grid-cols-2 gap-x-5 max-w-[800px]">
+              {/* Row 1 */}
+              <div className="col-span-1 flex flex-col justify-end pb-4">
+                <span className="text-[#d8d8d8] font-bold text-[13px] tracking-wide mb-1 px-0.5">OPERADOR</span>
                 <input
                   type="text"
                   list="operators-list"
-                  placeholder="Selecione ou digite..."
-                  className="bg-[#3c3f41] text-white p-3 rounded-md border border-transparent focus:border-[#4a90e2] focus:ring-1 focus:ring-[#4a90e2] outline-none transition disabled:opacity-50"
+                  className={inputClass}
                   value={form.operador}
                   onChange={(e) => setForm({ ...form, operador: e.target.value })}
                   disabled={isFormDisabled}
-                  required
                 />
                 <datalist id="operators-list">
                   {(bootstrapData?.operators ?? []).map((op) => (
                     <option key={op.id} value={op.name} />
                   ))}
                 </datalist>
-              </label>
+              </div>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-bold opacity-80 uppercase">Tipo</span>
+              <div className="col-span-1 flex items-center justify-between px-2.5 pb-4">
+                <span className="text-[#ffffff] text-[28px] font-bold leading-none">{runtime?.machine_name || 'Desconhecido'}</span>
+                <button
+                  type="button"
+                  onClick={() => alert('Settings: Replicar funcionalidade (Em breve)')}
+                  className="bg-[#2b2b2b] hover:bg-[#3c3f41] active:bg-[#4e5254] text-[#ffffff] text-[19px] py-1 px-3"
+                  title="Configuracoes"
+                >
+                  ⚙
+                </button>
+              </div>
+
+              {/* Row 2 */}
+              <div className="col-span-1 pb-4">
+                <span className="text-[#d8d8d8] font-bold text-[13px] tracking-wide mb-1 px-0.5 block">TIPO</span>
                 <select
-                  className="bg-[#3c3f41] text-white p-3 rounded-md border border-transparent focus:border-[#4a90e2] focus:ring-1 focus:ring-[#4a90e2] outline-none transition disabled:opacity-50"
+                  className={inputClass}
                   value={form.tipo}
                   onChange={(e) => setForm({ ...form, tipo: e.target.value })}
                   disabled={isFormDisabled}
@@ -337,36 +320,25 @@ export default function App() {
                   <option value="Reforma">Reforma</option>
                   <option value="PPD">PPD</option>
                 </select>
-              </label>
+              </div>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-bold opacity-80 uppercase">Pedido</span>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Digite o número e aperte Buscar"
-                    className="flex-1 bg-[#3c3f41] text-white p-3 rounded-md border border-transparent focus:border-[#4a90e2] focus:ring-1 focus:ring-[#4a90e2] outline-none transition disabled:opacity-50"
-                    value={form.pedido}
-                    onChange={(e) => setForm({ ...form, pedido: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && !isFormDisabled && handleSearchCnc()}
-                    disabled={isFormDisabled}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSearchCnc}
-                    disabled={isFormDisabled || !form.pedido}
-                    className="bg-[#4a90e2] hover:bg-[#3a7bc8] text-white px-4 rounded-md font-bold transition disabled:opacity-50 disabled:bg-[#3c3f41]"
-                  >
-                    Buscar
-                  </button>
-                </div>
-              </label>
+              <div className="col-span-1 pb-4">
+                <span className="text-[#d8d8d8] font-bold text-[13px] tracking-wide mb-1 px-0.5 block">PEDIDO</span>
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={form.pedido}
+                  onChange={(e) => setForm({ ...form, pedido: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && !isFormDisabled && handleSearchCnc()}
+                  disabled={isFormDisabled}
+                />
+              </div>
 
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-bold opacity-80 uppercase">Chapa / Retalho</span>
+              {/* Row 3 */}
+              <div className="col-span-1 pb-4">
+                <span className="text-[#d8d8d8] font-bold text-[13px] tracking-wide mb-1 px-0.5 block">CHAPA / RETALHO</span>
                 <select
-                  className="bg-[#3c3f41] text-white p-3 rounded-md border border-transparent focus:border-[#4a90e2] focus:ring-1 focus:ring-[#4a90e2] outline-none transition disabled:opacity-50"
+                  className={inputClass}
                   value={form.retalho}
                   onChange={(e) => setForm({ ...form, retalho: e.target.value })}
                   disabled={isFormDisabled}
@@ -374,82 +346,75 @@ export default function App() {
                   <option value="Chapa Inteira">Chapa Inteira</option>
                   <option value="Retalho">Retalho</option>
                 </select>
-              </label>
+              </div>
 
-              <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-bold opacity-80 uppercase text-[#f39c12]">Saída CNC a Cortar</span>
-                <div className="flex gap-2">
+              <div className="col-span-1 pb-4">
+                <span className="text-[#d8d8d8] font-bold text-[13px] tracking-wide mb-1 px-0.5 block">SAIDA CNC A CORTAR</span>
+                <div className="flex bg-[#2b2b2b]">
                   <select
-                    className="flex-1 bg-[#3c3f41] text-white p-3 rounded-md border border-transparent focus:border-[#f39c12] focus:ring-1 focus:ring-[#f39c12] outline-none transition disabled:opacity-50"
+                    className={inputClass + " flex-1 min-w-0 pr-1"}
                     value={form.saida}
                     onChange={(e) => setForm({ ...form, saida: e.target.value })}
                     disabled={isFormDisabled || availableSaidas.length === 0}
-                    required
                   >
-                    <option value="">
-                      {availableSaidas.length === 0 ? 'Nenhuma saída encontrada' : 'Selecione uma saída'}
-                    </option>
-                    {availableSaidas.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
+                    {availableSaidas.length === 0 ? (
+                       <option value=""></option>
+                    ) : (
+                       availableSaidas.map((s) => <option key={s} value={s}>{s}</option>)
+                    )}
                   </select>
                   <button
                     type="button"
                     onClick={handleOpenPdf}
                     disabled={!form.saida}
-                    className="bg-[#3c3f41] hover:bg-[#4a4c4e] text-white px-5 rounded-md font-bold transition border border-[#1e1e1e] disabled:opacity-40"
-                    title="Abrir PDF correspondente"
+                    className="bg-[#3c3f41] hover:bg-[#4e5254] text-[#ffffff] font-bold text-[12px] px-3 ml-2 shrink-0 disabled:opacity-80 active:bg-[#555555]"
                   >
                     PDF
                   </button>
                 </div>
-              </label>
-              
-              {/* Oculto, mas submete o formulário com Enter se os botoes nao renderizarem bem */}
-              <button type="submit" className="hidden" aria-hidden="true" />
-            </form>
-          </div>
-
-          <div className="bg-[#2f3136] rounded-xl border border-[#3c3f41] shadow-lg p-6 flex flex-col md:flex-row items-center gap-6 justify-between flex-1">
-            <div className="flex flex-col items-center justify-center flex-1 min-w-[200px] border-r border-[#3c3f41] pr-6">
-              <span className="text-sm font-bold uppercase opacity-60 mb-1">Tempo de Corte</span>
-              <div className="text-6xl font-black text-[#f39c12] tracking-widest font-mono drop-shadow-md">
-                {timerString}
               </div>
             </div>
+            {/* Oculto mas suporta submeter com o Enter */}
+            <button type="submit" className="hidden" aria-hidden="true" />
+          </form>
+        </div>
 
-            <div className="flex flex-col gap-4 flex-[2] w-full">
-              {!activeOperationId ? (
-                <button
-                  type="button"
-                  onClick={(e) => handleStartOperation()}
-                  disabled={loading || !form.saida}
-                  className="w-full bg-[#27ae60] hover:bg-[#2ecc71] text-white text-2xl font-black py-6 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-40 disabled:hover:translate-y-0"
-                >
-                  ▶ INICIAR CORTE
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleFinishOperation}
-                  disabled={loading}
-                  className="w-full bg-[#c0392b] hover:bg-[#e74c3c] text-white text-2xl font-black py-6 rounded-xl shadow-[0_0_20px_rgba(192,57,43,0.4)] transition-transform transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-40 disabled:hover:translate-y-0 animate-pulse"
-                >
-                  ■ FINALIZAR CORTE
-                </button>
-              )}
-            </div>
+        {/* Action Card */}
+        <div className="bg-[#2f3136] py-3 flex flex-col justify-end shrink-0">
+          <div className="flex justify-between items-center mb-3 px-3">
+             <span className={`font-bold text-[13px] ${status?.database_connected ? 'text-[#7ed957]' : 'text-[#f39c12]'}`}>
+                {status?.database_connected ? 'Rede OK' : 'Verificando rede...'}
+             </span>
+             <span className="text-[#f39c12] font-bold text-[36px] tracking-wide leading-none">{timerString}</span>
           </div>
-        </section>
+
+          <div className="flex px-3 pb-3 justify-end gap-3 h-[60px]">
+             <button
+               type="button"
+               onClick={() => handleStartOperation()}
+               disabled={loading || activeOperationId !== ''}
+               className="bg-[#27ae60] hover:bg-[#2ecc71] active:bg-[#4e5254] font-bold text-[16px] w-[140px] tracking-wide text-[#ffffff] disabled:opacity-40"
+             >
+               INICIAR
+             </button>
+             <button
+               type="button"
+               onClick={handleFinishOperation}
+               disabled={activeOperationId === '' || loading}
+               className="bg-[#c0392b] hover:bg-[#e74c3c] active:bg-[#4e5254] font-bold text-[16px] w-[140px] tracking-wide text-[#ffffff] disabled:opacity-40"
+             >
+               FINALIZAR
+             </button>
+          </div>
+        </div>
       </div>
 
-      {/* Alertas Toast */}
       {feedback && (
-        <div className="fixed bottom-6 right-6 bg-[#4a90e2] text-white px-6 py-4 rounded-lg shadow-2xl font-bold animate-in fade-in slide-in-from-bottom-4 z-50">
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#34495e] text-white px-10 py-6 rounded-none font-bold text-[28px] shadow-2xl z-50 text-center font-['Segoe_UI'] min-w-[300px]">
           {feedback}
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
