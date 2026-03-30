@@ -1,5 +1,4 @@
 use chrono::Utc;
-use tauri::State;
 
 use crate::{
     db::{

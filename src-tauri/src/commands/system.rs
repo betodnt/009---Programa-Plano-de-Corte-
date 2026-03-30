@@ -1,4 +1,4 @@
-use crate::error::{AppError, ErrorResponse};
+use crate::error::ErrorResponse;
 use crate::models::PathStatus;
 use serde::Serialize;
 use std::fs;
