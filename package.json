@@ -4,13 +4,11 @@
   "private": true,
   "scripts": {
     "tauri": "tauri",
-    "dev": "npm run tauri dev"
+    "dev": "npm run tauri dev",
+    "build": "npm run tauri build",
+    "postinstall": "npm install --prefix frontend"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.1",
-    "@typescript-eslint/eslint-plugin": "^8.58.0",
-    "@typescript-eslint/parser": "^8.58.0",
-    "eslint": "^10.1.0",
-    "eslint-plugin-react": "^7.37.5"
+    "@tauri-apps/cli": "^2.10.1"
   }
 }

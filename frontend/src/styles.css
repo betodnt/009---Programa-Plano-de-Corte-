@@ -19,7 +19,7 @@ body {
   min-height: 600px;
 }
 
-/* Tkinter style scrollbar */
+/* Desktop-style scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -40,7 +40,7 @@ body {
   background: #666666;
 }
 
-/* Base element resets to match Tkinter style if needed */
+/* Base element resets for the desktop UI */
 th {
   font-weight: bold;
 }

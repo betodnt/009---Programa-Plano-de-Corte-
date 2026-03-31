@@ -159,7 +159,7 @@ async fn get_monitor_snapshot(date: String) -> Result<serde_json::Value, String>
 
     let mut history_items = Vec::new();
     if let Ok(xml_content) = fs::read_to_string(&current_xml_path) {
-        // Parsing simples do XML (ajustado para o formato que o seu MonitorService.py costuma gerar)
+        // Parsing simples do XML, compatível com o formato legado do histórico
         let mut reader = quick_xml::Reader::from_str(&xml_content);
         let mut buf = Vec::new();
         loop {
@@ -208,7 +208,7 @@ async fn finish_operation(operation_id: String) -> Result<serde_json::Value, Str
         fs::write(&lock_file, serde_json::to_string_pretty(&locks).unwrap())
             .map_err(|e| e.to_string())?;
         
-        // Calcular duração e salvar no XML (Igual ao MonitorService.py)
+        // Calcular duração e salvar no XML no mesmo formato histórico
         let start_str = removed["started_at"].as_str().unwrap_or("");
         let start_dt = chrono::DateTime::parse_from_rfc3339(start_str).map(|d| d.with_timezone(&Local)).ok();
         let now = Local::now();

@@ -1,35 +1,15 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.venv
-venv/
-ENV/
-env/
-
-# Rust
+# Rust / Tauri
 src-tauri/target/
 target/
 target-cli/
 **/*.rs.bk
 Cargo.lock
+
+# Node / Frontend
+node_modules/
+dist/
+.env.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -42,14 +22,5 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
-# Node
-node_modules/
-dist/
-.env.local
-.env.*.local
-
-# Project specific
+# Logs
 *.log
-.pytest_cache/
-.coverage
-htmlcov/
